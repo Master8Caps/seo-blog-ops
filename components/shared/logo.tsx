@@ -19,25 +19,48 @@ export function Logo({ collapsed, className }: LogoProps) {
           className="h-5 w-5"
           xmlns="http://www.w3.org/2000/svg"
         >
-          {/* Pen body / upward arrow shape */}
-          <path
-            d="M12 3L8 8H10.5V14H13.5V8H16L12 3Z"
+          {/* Paper - slightly rotated for depth */}
+          <rect
+            x="5"
+            y="3"
+            width="13"
+            height="17"
+            rx="1.5"
+            fill="currentColor"
+            className="text-primary-foreground/30"
+          />
+          {/* Paper front */}
+          <rect
+            x="4"
+            y="4"
+            width="13"
+            height="17"
+            rx="1.5"
             fill="currentColor"
             className="text-primary-foreground"
           />
-          {/* Pen nib / writing tip */}
+          {/* Text lines on paper */}
           <path
-            d="M10 15.5L12 20L14 15.5H10Z"
-            fill="currentColor"
-            className="text-primary-foreground/80"
-          />
-          {/* Writing line */}
-          <path
-            d="M7 21H17"
+            d="M7 9H14M7 12H12M7 15H10"
             stroke="currentColor"
-            strokeWidth="1.5"
+            strokeWidth="1.2"
             strokeLinecap="round"
-            className="text-primary-foreground/60"
+            className="text-primary"
+          />
+          {/* Pen - diagonal across the paper */}
+          <path
+            d="M14 7L19.5 1.5"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            className="text-primary-foreground"
+          />
+          <path
+            d="M13 8L14 7"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            className="text-primary-foreground/70"
           />
         </svg>
       </div>
