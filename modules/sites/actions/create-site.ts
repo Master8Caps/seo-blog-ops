@@ -1,8 +1,5 @@
 "use server"
 
-// Allow up to 60s for crawling + AI analysis on Vercel
-export const maxDuration = 60
-
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/db/prisma"
 import { createSiteSchema, type CreateSiteInput } from "../schemas"
