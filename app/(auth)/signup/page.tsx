@@ -58,12 +58,12 @@ export default function SignupPage() {
 
   return (
     <Card>
-      <CardHeader className="space-y-1 p-6">
+      <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold">Create account</CardTitle>
         <CardDescription>Enter your details to get started</CardDescription>
       </CardHeader>
       <form onSubmit={handleSignup}>
-        <CardContent className="space-y-4 px-6 pb-6">
+        <CardContent className="space-y-4">
           {error && (
             <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
               {error}
@@ -104,7 +104,7 @@ export default function SignupPage() {
             />
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-4 p-6 pt-6">
+        <CardFooter className="flex flex-col space-y-4">
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Creating account..." : "Create account"}
           </Button>

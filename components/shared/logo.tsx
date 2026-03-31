@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 
 interface LogoProps {
@@ -9,7 +10,7 @@ interface LogoProps {
 
 export function Logo({ collapsed, className }: LogoProps) {
   return (
-    <div className={cn("flex items-center gap-3", className)}>
+    <Link href="/dashboard" className={cn("flex items-center gap-3", className)}>
       {/* Icon — pen nib that doubles as an upward arrow */}
       <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary shadow-md shadow-primary/25">
         <svg
@@ -50,6 +51,6 @@ export function Logo({ collapsed, className }: LogoProps) {
           </span>
         </div>
       )}
-    </div>
+    </Link>
   )
 }
