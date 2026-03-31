@@ -1,8 +1,8 @@
 import type { CrawledPage, CrawlResult } from "../types"
 
-const MAX_PAGES = 20
-const MAX_DEPTH = 2
-const MAX_CONTENT_LENGTH = 5000 // per page, in characters
+const MAX_PAGES = 10
+const MAX_DEPTH = 1
+const MAX_CONTENT_LENGTH = 3000 // per page, in characters
 
 function extractTextContent(html: string): string {
   return html
@@ -51,9 +51,11 @@ async function fetchPage(url: string): Promise<string | null> {
     const response = await fetch(url, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; SEOBlogOps/1.0; +https://seoblogops.com)",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(5000),
+      redirect: "follow",
     })
     if (!response.ok) return null
     const contentType = response.headers.get("content-type") || ""
