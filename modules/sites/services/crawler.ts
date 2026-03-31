@@ -5,16 +5,70 @@ const MAX_DEPTH = 1
 const MAX_CONTENT_LENGTH = 5000 // per page, in characters
 
 function extractTextContent(html: string): string {
-  return html
+  // Primary: strip tags and get visible text
+  const visible = html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-    .replace(/<footer[\s\S]*?<\/footer>/gi, "")
-    .replace(/<header[\s\S]*?<\/header>/gi, "")
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, MAX_CONTENT_LENGTH)
+
+  if (visible.length > 100) {
+    return visible.slice(0, MAX_CONTENT_LENGTH)
+  }
+
+  // Fallback for JS-rendered SPAs: extract from meta tags, JSON-LD, and data attributes
+  const parts: string[] = [visible]
+
+  // Meta description
+  const metaDesc = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)
+    ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i)
+  if (metaDesc) parts.push(metaDesc[1])
+
+  // OG tags
+  const ogMatches = html.matchAll(/<meta[^>]+property=["']og:(?:title|description|site_name)["'][^>]+content=["']([^"']+)["']/gi)
+  for (const m of ogMatches) parts.push(m[1])
+
+  // JSON-LD structured data
+  const jsonLdMatches = html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
+  for (const m of jsonLdMatches) {
+    try {
+      const data = JSON.parse(m[1])
+      const texts = extractJsonLdText(data)
+      parts.push(...texts)
+    } catch {
+      // Skip invalid JSON-LD
+    }
+  }
+
+  // Alt text from images
+  const altMatches = html.matchAll(/alt=["']([^"']{10,})["']/gi)
+  for (const m of altMatches) parts.push(m[1])
+
+  // Content from data attributes commonly used by SPAs
+  const dataMatches = html.matchAll(/data-(?:text|content|label|title)=["']([^"']+)["']/gi)
+  for (const m of dataMatches) parts.push(m[1])
+
+  return parts.join(" ").replace(/\s+/g, " ").trim().slice(0, MAX_CONTENT_LENGTH)
+}
+
+function extractJsonLdText(data: unknown): string[] {
+  const texts: string[] = []
+  if (!data || typeof data !== "object") return texts
+
+  if (Array.isArray(data)) {
+    for (const item of data) texts.push(...extractJsonLdText(item))
+    return texts
+  }
+
+  const obj = data as Record<string, unknown>
+  for (const key of ["name", "description", "headline", "articleBody", "text", "about"]) {
+    if (typeof obj[key] === "string") {
+      texts.push(obj[key] as string)
+    }
+  }
+
+  return texts
 }
 
 function extractTitle(html: string): string {
@@ -94,7 +148,8 @@ export async function crawlSite(url: string): Promise<CrawlResult> {
     const title = extractTitle(html)
     const content = extractTextContent(html)
 
-    if (content.length > 50) {
+    // Lower threshold — even meta tags are useful for AI analysis
+    if (content.length > 20) {
       pages.push({ url: normalizedUrl, title, content })
     }
 
