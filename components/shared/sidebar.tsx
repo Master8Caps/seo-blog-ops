@@ -19,6 +19,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { Logo } from "@/components/shared/logo"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -40,13 +41,8 @@ export function Sidebar() {
         )}
       >
         {/* Logo */}
-        <div className="flex h-14 items-center border-b border-border px-4">
-          {!collapsed && (
-            <span className="text-lg font-bold text-primary">SEO Blog Ops</span>
-          )}
-          {collapsed && (
-            <span className="text-lg font-bold text-primary">SB</span>
-          )}
+        <div className="flex h-14 items-center border-b border-border px-3">
+          <Logo collapsed={collapsed} />
         </div>
 
         {/* Navigation */}
