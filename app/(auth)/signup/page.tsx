@@ -15,6 +15,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { checkEmail } from "./check-email"
+import { UserPlus } from "lucide-react"
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
@@ -29,6 +31,14 @@ export default function SignupPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+
+    // Check whitelist first
+    const allowed = await checkEmail(email)
+    if (!allowed) {
+      setError("This email is not authorized. Contact your admin for access.")
+      setLoading(false)
+      return
+    }
 
     const { error } = await supabase.auth.signUp({
       email,
@@ -49,8 +59,11 @@ export default function SignupPage() {
   }
 
   return (
-    <Card>
-      <CardHeader className="space-y-1">
+    <Card className="border-border/50">
+      <CardHeader className="space-y-2 pb-4">
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 mb-2">
+          <UserPlus className="h-5 w-5 text-primary" />
+        </div>
         <CardTitle className="text-2xl font-bold">Create account</CardTitle>
         <CardDescription>
           Enter your details to get started
@@ -79,7 +92,7 @@ export default function SignupPage() {
             <Input
               id="email"
               type="email"
-              placeholder="you@example.com"
+              placeholder="you@company.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
