@@ -46,7 +46,7 @@ function extractInternalLinks(html: string, baseUrl: string): string[] {
   return [...new Set(links)]
 }
 
-async function fetchPage(url: string): Promise<string | null> {
+async function fetchPage(url: string): Promise<{ html: string | null; error?: string }> {
   try {
     const response = await fetch(url, {
       headers: {
@@ -54,15 +54,19 @@ async function fetchPage(url: string): Promise<string | null> {
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
       redirect: "follow",
     })
-    if (!response.ok) return null
+    if (!response.ok) {
+      return { html: null, error: `HTTP ${response.status} ${response.statusText}` }
+    }
     const contentType = response.headers.get("content-type") || ""
-    if (!contentType.includes("text/html")) return null
-    return await response.text()
-  } catch {
-    return null
+    if (!contentType.includes("text/html")) {
+      return { html: null, error: `Wrong content-type: ${contentType}` }
+    }
+    return { html: await response.text() }
+  } catch (e) {
+    return { html: null, error: e instanceof Error ? e.message : "Unknown fetch error" }
   }
 }
 
@@ -80,11 +84,12 @@ export async function crawlSite(url: string): Promise<CrawlResult> {
     if (visited.has(normalizedUrl)) continue
     visited.add(normalizedUrl)
 
-    const html = await fetchPage(normalizedUrl)
-    if (!html) {
-      errors.push(`Failed to fetch: ${normalizedUrl}`)
+    const result = await fetchPage(normalizedUrl)
+    if (!result.html) {
+      errors.push(`Failed to fetch ${normalizedUrl}: ${result.error ?? "unknown"}`)
       continue
     }
+    const html = result.html
 
     const title = extractTitle(html)
     const content = extractTextContent(html)

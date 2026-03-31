@@ -61,9 +61,12 @@ export async function crawlAndAnalyzeSite(
         where: { id: siteId },
         data: { onboardingStatus: "pending" },
       })
+      const errorDetail = crawlResult.errors.length > 0
+        ? crawlResult.errors.slice(0, 3).join("; ")
+        : "No pages returned"
       return {
         success: false,
-        error: "Could not crawl any pages. Check the URL and try again.",
+        error: `Could not crawl any pages: ${errorDetail}`,
       }
     }
 
