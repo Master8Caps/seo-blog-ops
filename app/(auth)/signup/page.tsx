@@ -63,7 +63,7 @@ export default function SignupPage() {
         <CardDescription>Enter your details to get started</CardDescription>
       </CardHeader>
       <form onSubmit={handleSignup}>
-        <CardContent className="space-y-4 px-6">
+        <CardContent className="space-y-4 px-6 pb-6">
           {error && (
             <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
               {error}
