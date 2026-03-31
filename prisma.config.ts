@@ -10,5 +10,8 @@ export default defineConfig({
   },
   datasource: {
     url: process.env["DATABASE_URL"],
+    // directUrl is used by Supabase for migrations but not yet in the Prisma types
+    // @ts-expect-error -- directUrl is valid at runtime for Supabase pooler setups
+    directUrl: process.env["DIRECT_URL"],
   },
 });
