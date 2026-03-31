@@ -1,8 +1,7 @@
-import { buttonVariants } from "@/components/ui/button"
 import { Globe, Plus } from "lucide-react"
-import Link from "next/link"
 import { getSites } from "@/modules/sites/actions/get-sites"
 import { SiteCard } from "@/components/shared/site-card"
+import { LinkButton } from "@/components/shared/link-button"
 
 export default async function SitesPage() {
   const sites = await getSites()
@@ -16,10 +15,10 @@ export default async function SitesPage() {
             Manage your websites and SEO profiles.
           </p>
         </div>
-        <Link href="/sites/new" className={buttonVariants()}>
+        <LinkButton href="/sites/new">
           <Plus className="mr-2 h-4 w-4" />
           Add Site
-        </Link>
+        </LinkButton>
       </div>
 
       {sites.length === 0 ? (
@@ -29,13 +28,10 @@ export default async function SitesPage() {
           <p className="text-sm text-muted-foreground">
             Add your first website to get started.
           </p>
-          <Link
-            href="/sites/new"
-            className={buttonVariants({ className: "mt-4" })}
-          >
+          <LinkButton href="/sites/new" className="mt-4">
             <Plus className="mr-2 h-4 w-4" />
             Add Site
-          </Link>
+          </LinkButton>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

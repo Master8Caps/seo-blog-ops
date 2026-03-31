@@ -1,6 +1,4 @@
 import { notFound } from "next/navigation"
-import Link from "next/link"
-import { buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   Globe,
@@ -13,6 +11,7 @@ import {
   Pencil,
 } from "lucide-react"
 import { getSiteById } from "@/modules/sites/actions/get-sites"
+import { LinkButton } from "@/components/shared/link-button"
 import type { SiteProfile } from "@/modules/sites/types"
 
 export default async function SiteDetailPage({
@@ -32,12 +31,9 @@ export default async function SiteDetailPage({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link
-          href="/sites"
-          className={buttonVariants({ variant: "ghost", size: "icon" })}
-        >
+        <LinkButton href="/sites" variant="ghost" size="icon">
           <ArrowLeft className="h-4 w-4" />
-        </Link>
+        </LinkButton>
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold tracking-tight">{site.name}</h1>
@@ -48,13 +44,10 @@ export default async function SiteDetailPage({
           <p className="text-sm text-muted-foreground">{site.url}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href={`/sites/${siteId}/edit`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
+          <LinkButton href={`/sites/${siteId}/edit`} variant="outline" size="sm">
             <Pencil className="mr-2 h-3.5 w-3.5" />
             Edit
-          </Link>
+          </LinkButton>
         </div>
       </div>
 
@@ -173,20 +166,14 @@ export default async function SiteDetailPage({
 
       {/* Quick Links */}
       <div className="flex gap-3">
-        <Link
-          href={`/sites/${siteId}/research`}
-          className={buttonVariants({ variant: "outline" })}
-        >
+        <LinkButton href={`/sites/${siteId}/research`} variant="outline">
           <Search className="mr-2 h-4 w-4" />
           Keyword Research
-        </Link>
-        <Link
-          href={`/sites/${siteId}/content`}
-          className={buttonVariants({ variant: "outline" })}
-        >
+        </LinkButton>
+        <LinkButton href={`/sites/${siteId}/content`} variant="outline">
           <FileText className="mr-2 h-4 w-4" />
           Content
-        </Link>
+        </LinkButton>
       </div>
     </div>
   )
