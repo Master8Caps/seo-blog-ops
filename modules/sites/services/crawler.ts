@@ -2,7 +2,7 @@ import type { CrawledPage, CrawlResult } from "../types"
 
 const MAX_PAGES = 10
 const MAX_DEPTH = 1
-const MAX_CONTENT_LENGTH = 3000 // per page, in characters
+const MAX_CONTENT_LENGTH = 5000 // per page, in characters
 
 function extractTextContent(html: string): string {
   return html
