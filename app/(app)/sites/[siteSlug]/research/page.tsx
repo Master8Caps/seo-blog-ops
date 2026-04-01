@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Search, Loader2, RefreshCw } from "lucide-react"
+import { Search, Loader2, RefreshCw, Trash2 } from "lucide-react"
 import { LoadingSpinner } from "@/components/shared/loading-spinner"
 import { KeywordTable } from "@/components/shared/keyword-table"
 import {
@@ -11,7 +11,7 @@ import {
   discoverFromSite,
   scoreTopKeywords,
 } from "@/modules/research/actions/run-research"
-import { getKeywordsForSiteId, getKeywordStats } from "@/modules/research/actions/get-keywords"
+import { getKeywordsForSiteId, getKeywordStats, clearKeywords } from "@/modules/research/actions/get-keywords"
 import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
 
 export default function ResearchPage() {
@@ -104,7 +104,23 @@ export default function ResearchPage() {
     <div className="space-y-6">
       {/* Toolbar */}
       <div className="flex items-center justify-between">
-        <div />
+        <div>
+          {keywords.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (!confirm("Delete all keywords and start fresh?")) return
+                await clearKeywords(siteId)
+                await refreshData()
+              }}
+              disabled={researching}
+            >
+              <Trash2 className="mr-2 h-3.5 w-3.5" />
+              Clear All
+            </Button>
+          )}
+        </div>
         <Button
           onClick={handleRunResearch}
           disabled={researching}

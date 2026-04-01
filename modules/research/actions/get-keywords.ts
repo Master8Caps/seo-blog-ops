@@ -18,6 +18,18 @@ export async function getKeywordsForSiteId(
   })
 }
 
+export async function clearKeywords(siteId: string) {
+  const site = await prisma.keyword.findFirst({
+    where: { siteId },
+    include: { site: { select: { slug: true } } },
+  })
+  await prisma.keyword.deleteMany({ where: { siteId } })
+  if (site) {
+    const { revalidatePath } = await import("next/cache")
+    revalidatePath(`/sites/${site.site.slug}/research`)
+  }
+}
+
 export async function getKeywordStats(siteId: string) {
   const [total, approved, discovered] = await Promise.all([
     prisma.keyword.count({ where: { siteId } }),
