@@ -1,0 +1,1 @@
+ALTER TABLE keywords ADD COLUMN ai_selected BOOLEAN NOT NULL DEFAULT false;

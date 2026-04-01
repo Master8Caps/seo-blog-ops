@@ -70,7 +70,8 @@ model Keyword {
   isPrimary Boolean @default(false) @map("is_primary")
 
   // Status
-  status String @default("discovered")
+  status     String  @default("discovered")
+  aiSelected Boolean @default(false) @map("ai_selected")
 
   // Relations
   posts Post[]
