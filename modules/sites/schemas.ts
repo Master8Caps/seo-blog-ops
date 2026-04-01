@@ -3,12 +3,12 @@ import { z } from "zod"
 export const createSiteSchema = z.object({
   url: z
     .string()
-    .url("Please enter a valid URL")
+    .min(1, "Please enter a URL")
     .transform((url) => {
-      // Normalize: ensure https, remove trailing slash
       if (!url.startsWith("http")) url = `https://${url}`
       return url.replace(/\/+$/, "")
-    }),
+    })
+    .pipe(z.string().url("Please enter a valid URL")),
   name: z.string().min(1, "Site name is required").max(100),
   description: z.string().max(500).optional(),
 })
