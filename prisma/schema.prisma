@@ -45,6 +45,7 @@ model Site {
   // Relations
   keywords Keyword[]
   posts    Post[]
+  jobs     JobQueue[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -96,6 +97,8 @@ model Post {
   metaTitle   String? @map("meta_title")
   metaDesc    String? @map("meta_desc")
   featuredImg String? @map("featured_img")
+  images      Json?
+  humanized   Boolean @default(false)
 
   // SEO context
   keywordId String?  @map("keyword_id")
@@ -121,4 +124,17 @@ model Post {
 
   @@unique([siteId, slug])
   @@map("posts")
+}
+
+model JobQueue {
+  id        String   @id @default(uuid())
+  siteId    String   @map("site_id")
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  type      String
+  status    String   @default("pending")
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("job_queue")
 }
