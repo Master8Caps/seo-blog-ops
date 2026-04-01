@@ -1,6 +1,7 @@
 import Link from "next/link"
-import { Globe, FileText, Search } from "lucide-react"
+import { FileText, Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { SiteFavicon } from "@/components/shared/site-favicon"
 
 interface SiteCardProps {
   id: string
@@ -40,7 +41,7 @@ export function SiteCard({
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-            <Globe className="h-5 w-5 text-primary" />
+            <SiteFavicon url={url} size={20} />
           </div>
           <div>
             <h3 className="font-semibold group-hover:text-primary transition-colors">

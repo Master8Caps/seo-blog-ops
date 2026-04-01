@@ -19,6 +19,7 @@ import {
   CardDescription,
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { SiteFavicon } from "@/components/shared/site-favicon"
 
 const statusConfig: Record<
   string,
@@ -157,7 +158,7 @@ export default async function DashboardPage() {
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
-                          <Globe className="h-4 w-4 text-primary" />
+                          <SiteFavicon url={site.url} size={16} />
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">
