@@ -32,7 +32,27 @@ const statusConfig: Record<
 }
 
 export default async function DashboardPage() {
-  const stats = await getDashboardStats()
+  let stats: Awaited<ReturnType<typeof getDashboardStats>>
+  try {
+    stats = await getDashboardStats()
+  } catch (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Overview of your content operations.
+          </p>
+        </div>
+        <div className="rounded-md bg-destructive/15 p-4 text-sm text-destructive">
+          Failed to load dashboard data. Please try refreshing.
+          {process.env.NODE_ENV === "development" && (
+            <pre className="mt-2 text-xs">{String(error)}</pre>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

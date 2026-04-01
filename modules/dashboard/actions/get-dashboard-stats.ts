@@ -31,6 +31,7 @@ export interface DashboardStats {
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
+  // Batch 1: Site counts + recent sites
   const [
     totalSites,
     pendingSites,
@@ -38,13 +39,6 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     analyzedSites,
     readySites,
     autopilotActive,
-    totalKeywords,
-    approvedKeywords,
-    totalPosts,
-    draftPosts,
-    reviewPosts,
-    approvedPosts,
-    publishedPosts,
     recentSites,
   ] = await Promise.all([
     prisma.site.count(),
@@ -53,13 +47,6 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     prisma.site.count({ where: { onboardingStatus: "analyzed" } }),
     prisma.site.count({ where: { onboardingStatus: "ready" } }),
     prisma.site.count({ where: { autopilot: true } }),
-    prisma.keyword.count(),
-    prisma.keyword.count({ where: { status: "approved" } }),
-    prisma.post.count(),
-    prisma.post.count({ where: { status: "draft" } }),
-    prisma.post.count({ where: { status: "review" } }),
-    prisma.post.count({ where: { status: "approved" } }),
-    prisma.post.count({ where: { status: "published" } }),
     prisma.site.findMany({
       take: 5,
       orderBy: { createdAt: "desc" },
@@ -72,6 +59,25 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         createdAt: true,
       },
     }),
+  ])
+
+  // Batch 2: Keyword + Post counts
+  const [
+    totalKeywords,
+    approvedKeywords,
+    totalPosts,
+    draftPosts,
+    reviewPosts,
+    approvedPosts,
+    publishedPosts,
+  ] = await Promise.all([
+    prisma.keyword.count(),
+    prisma.keyword.count({ where: { status: "approved" } }),
+    prisma.post.count(),
+    prisma.post.count({ where: { status: "draft" } }),
+    prisma.post.count({ where: { status: "review" } }),
+    prisma.post.count({ where: { status: "approved" } }),
+    prisma.post.count({ where: { status: "published" } }),
   ])
 
   return {
