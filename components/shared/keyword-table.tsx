@@ -141,28 +141,35 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
     }
   }
 
-  const sorted = [...keywords].sort((a, b) => {
-    if (groupBy !== "none") {
-      const order = getGroupOrder(groupBy)
-      const aGroup = getGroupKey(a, groupBy)
-      const bGroup = getGroupKey(b, groupBy)
-      const aOrder = order[aGroup] ?? 99
-      const bOrder = order[bGroup] ?? 99
-      if (aOrder !== bOrder) return aOrder - bOrder
-      if (aGroup !== bGroup) return aGroup.localeCompare(bGroup)
-    }
+  function applySortAndGroup(items: KeywordRow[]) {
+    return [...items].sort((a, b) => {
+      if (groupBy !== "none") {
+        const order = getGroupOrder(groupBy)
+        const aGroup = getGroupKey(a, groupBy)
+        const bGroup = getGroupKey(b, groupBy)
+        const aOrder = order[aGroup] ?? 99
+        const bOrder = order[bGroup] ?? 99
+        if (aOrder !== bOrder) return aOrder - bOrder
+        if (aGroup !== bGroup) return aGroup.localeCompare(bGroup)
+      }
 
-    const aVal = a[sortField] ?? 0
-    const bVal = b[sortField] ?? 0
-    if (typeof aVal === "string" && typeof bVal === "string") {
+      const aVal = a[sortField] ?? 0
+      const bVal = b[sortField] ?? 0
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return sortDir === "asc"
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal)
+      }
       return sortDir === "asc"
-        ? aVal.localeCompare(bVal)
-        : bVal.localeCompare(aVal)
-    }
-    return sortDir === "asc"
-      ? (aVal as number) - (bVal as number)
-      : (bVal as number) - (aVal as number)
-  })
+        ? (aVal as number) - (bVal as number)
+        : (bVal as number) - (aVal as number)
+    })
+  }
+
+  // Split into approved (top) and rest, each sorted independently
+  const approvedKeywords = applySortAndGroup(keywords.filter((k) => k.status === "approved"))
+  const otherKeywords = applySortAndGroup(keywords.filter((k) => k.status !== "approved"))
+  const sorted = [...approvedKeywords, ...otherKeywords]
 
   function toggleSelect(id: string) {
     const next = new Set(selected)
@@ -204,6 +211,8 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
   }
 
   let lastGroupKey: string | null = null
+  let shownApprovedHeader = false
+  let shownOtherHeader = false
 
   return (
     <div className="space-y-4">
@@ -301,6 +310,20 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
                 groupKey !== null && groupKey !== lastGroupKey
               if (groupKey !== null) lastGroupKey = groupKey
 
+              // Section headers for approved vs other
+              const isApproved = kw.status === "approved"
+              let showSectionHeader = false
+              let sectionLabel = ""
+              if (isApproved && !shownApprovedHeader && approvedKeywords.length > 0) {
+                shownApprovedHeader = true
+                showSectionHeader = true
+                sectionLabel = `Approved (${approvedKeywords.length})`
+              } else if (!isApproved && !shownOtherHeader && otherKeywords.length > 0) {
+                shownOtherHeader = true
+                showSectionHeader = true
+                sectionLabel = `Discovered (${otherKeywords.length})`
+              }
+
               const compKey = kw.competition?.toLowerCase() ?? ""
               const compStyle =
                 competitionConfig[compKey] ?? { className: "text-muted-foreground" }
@@ -311,6 +334,15 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
 
               return (
                 <>
+                  {showSectionHeader && (
+                    <TableRow key={`section-${sectionLabel}`} className="bg-muted/50">
+                      <TableCell colSpan={10} className="py-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          {sectionLabel}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {showGroupHeader && (
                     <TableRow key={`group-${groupKey}`} className="bg-muted/30">
                       <TableCell colSpan={10} className="py-2">
