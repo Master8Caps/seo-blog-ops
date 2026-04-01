@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { FileText } from "lucide-react"
+import { FileText, ArrowRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { getPosts } from "@/modules/content/actions/get-posts"
 
@@ -12,6 +12,30 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 
 export default async function ContentPage() {
   const posts = await getPosts()
+
+  // Group posts by site
+  const siteGroups = new Map<
+    string,
+    {
+      siteName: string
+      siteSlug: string
+      siteUrl: string
+      posts: typeof posts
+    }
+  >()
+
+  for (const post of posts) {
+    const key = post.siteId
+    if (!siteGroups.has(key)) {
+      siteGroups.set(key, {
+        siteName: post.site.name,
+        siteSlug: post.site.slug,
+        siteUrl: "",
+        posts: [],
+      })
+    }
+    siteGroups.get(key)!.posts.push(post)
+  }
 
   return (
     <div className="space-y-6">
@@ -31,49 +55,83 @@ export default async function ContentPage() {
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border border-border">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border text-left text-sm text-muted-foreground">
-                <th className="p-3 font-medium">Title</th>
-                <th className="p-3 font-medium">Site</th>
-                <th className="p-3 font-medium">Keyword</th>
-                <th className="p-3 font-medium">Status</th>
-                <th className="p-3 font-medium">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {posts.map((post) => {
-                const status = statusConfig[post.status] ?? statusConfig.draft
-                return (
-                  <tr key={post.id} className="border-b border-border last:border-0">
-                    <td className="p-3">
+        <div className="space-y-8">
+          {Array.from(siteGroups.entries()).map(([siteId, group]) => {
+            const recentPosts = group.posts.slice(0, 3)
+            const hasMore = group.posts.length > 3
+
+            return (
+              <div key={siteId}>
+                {/* Site Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold">{group.siteName}</h2>
+                    <span className="text-sm text-muted-foreground">
+                      ({group.posts.length} {group.posts.length === 1 ? "post" : "posts"})
+                    </span>
+                  </div>
+                  {hasMore && (
+                    <Link
+                      href={`/sites/${group.siteSlug}/content`}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      See all <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  )}
+                </div>
+
+                {/* Post Cards Grid */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {recentPosts.map((post) => {
+                    const status = statusConfig[post.status] ?? statusConfig.draft
+                    return (
                       <Link
+                        key={post.id}
                         href={`/content/${post.id}`}
-                        className="font-medium hover:text-primary transition-colors"
+                        className="group block rounded-lg border border-border bg-card overflow-hidden transition-colors hover:border-primary/50"
                       >
-                        {post.title}
+                        {/* Featured Image */}
+                        <div className="aspect-video bg-muted relative overflow-hidden">
+                          {post.featuredImg ? (
+                            <img
+                              src={post.featuredImg}
+                              alt={post.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <FileText className="h-8 w-8 text-muted-foreground/30" />
+                            </div>
+                          )}
+                          <div className="absolute top-2 right-2">
+                            <Badge variant="outline" className={`text-xs backdrop-blur-sm ${status.className}`}>
+                              {status.label}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Card Content */}
+                        <div className="p-4">
+                          <h3 className="font-semibold line-clamp-2 group-hover:text-primary transition-colors">
+                            {post.title}
+                          </h3>
+                          {post.excerpt && (
+                            <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                              {post.excerpt}
+                            </p>
+                          )}
+                          <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{post.keyword?.keyword ?? "—"}</span>
+                            <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
                       </Link>
-                    </td>
-                    <td className="p-3 text-sm text-muted-foreground">
-                      {post.site.name}
-                    </td>
-                    <td className="p-3 text-sm text-muted-foreground">
-                      {post.keyword?.keyword ?? "—"}
-                    </td>
-                    <td className="p-3">
-                      <Badge variant="outline" className={`text-xs ${status.className}`}>
-                        {status.label}
-                      </Badge>
-                    </td>
-                    <td className="p-3 text-sm text-muted-foreground">
-                      {new Date(post.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
