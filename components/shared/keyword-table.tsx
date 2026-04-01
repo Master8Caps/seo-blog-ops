@@ -12,13 +12,20 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Check, X, ArrowUpDown, Layers } from "lucide-react"
+import { Check, X, ArrowUpDown, Layers, ChevronDown } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   updateKeywordStatus,
   bulkUpdateKeywordStatus,
 } from "@/modules/research/actions/update-keyword"
 
 type SortField = "keyword" | "searchVolume" | "cpc" | "relevanceScore"
+type GroupField = "none" | "competition" | "intent" | "cluster" | "status"
 
 function SortButton({
   field,
@@ -71,11 +78,45 @@ const statusConfig: Record<string, { className: string }> = {
   rejected: { className: "border-red-500/50 bg-red-500/10 text-red-400" },
 }
 
-const intentColors: Record<string, "default" | "secondary" | "outline"> = {
-  informational: "secondary",
-  transactional: "default",
-  commercial: "default",
-  navigational: "outline",
+const intentConfig: Record<string, { className: string }> = {
+  informational: { className: "border-sky-500/50 bg-sky-500/10 text-sky-400" },
+  transactional: { className: "border-emerald-500/50 bg-emerald-500/10 text-emerald-400" },
+  commercial: { className: "border-amber-500/50 bg-amber-500/10 text-amber-400" },
+  navigational: { className: "border-violet-500/50 bg-violet-500/10 text-violet-400" },
+}
+
+const groupLabels: Record<GroupField, string> = {
+  none: "No Grouping",
+  competition: "Competition",
+  intent: "Intent",
+  cluster: "Cluster",
+  status: "Status",
+}
+
+function getGroupKey(kw: KeywordRow, field: GroupField): string {
+  switch (field) {
+    case "competition":
+      return kw.competition?.toLowerCase() ?? "unknown"
+    case "intent":
+      return kw.intent ?? "unclassified"
+    case "cluster":
+      return kw.cluster ?? "uncategorized"
+    case "status":
+      return kw.status
+    default:
+      return ""
+  }
+}
+
+function getGroupOrder(field: GroupField): Record<string, number> {
+  switch (field) {
+    case "competition":
+      return { low: 0, medium: 1, high: 2 }
+    case "status":
+      return { approved: 0, discovered: 1, used: 2, rejected: 3 }
+    default:
+      return {}
+  }
 }
 
 export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
@@ -84,9 +125,8 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
   const [sortField, setSortField] = useState<SortField>("searchVolume")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
   const [updating, setUpdating] = useState<string | null>(null)
-  const [groupByCompetition, setGroupByCompetition] = useState(false)
+  const [groupBy, setGroupBy] = useState<GroupField>("none")
 
-  // Sync internal state when parent passes new data (e.g. after AI scoring)
   useEffect(() => {
     setKeywords(propKeywords)
   }, [propKeywords])
@@ -101,12 +141,14 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
   }
 
   const sorted = [...keywords].sort((a, b) => {
-    // If grouping by competition, sort by competition first
-    if (groupByCompetition) {
-      const compOrder: Record<string, number> = { low: 0, medium: 1, high: 2 }
-      const aComp = compOrder[a.competition?.toLowerCase() ?? ""] ?? 3
-      const bComp = compOrder[b.competition?.toLowerCase() ?? ""] ?? 3
-      if (aComp !== bComp) return aComp - bComp
+    if (groupBy !== "none") {
+      const order = getGroupOrder(groupBy)
+      const aGroup = getGroupKey(a, groupBy)
+      const bGroup = getGroupKey(b, groupBy)
+      const aOrder = order[aGroup] ?? 99
+      const bOrder = order[bGroup] ?? 99
+      if (aOrder !== bOrder) return aOrder - bOrder
+      if (aGroup !== bGroup) return aGroup.localeCompare(bGroup)
     }
 
     const aVal = a[sortField] ?? 0
@@ -160,8 +202,7 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
     setUpdating(null)
   }
 
-  // Track competition group headers when grouping
-  let lastCompetition: string | null = null
+  let lastGroupKey: string | null = null
 
   return (
     <div className="space-y-4">
@@ -193,14 +234,31 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
             </>
           )}
         </div>
-        <Button
-          variant={groupByCompetition ? "default" : "outline"}
-          size="sm"
-          onClick={() => setGroupByCompetition(!groupByCompetition)}
-        >
-          <Layers className="mr-1.5 h-3.5 w-3.5" />
-          Group by Competition
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant={groupBy !== "none" ? "default" : "outline"}
+                size="sm"
+              >
+                <Layers className="mr-1.5 h-3.5 w-3.5" />
+                {groupBy === "none" ? "Group by" : `Grouped: ${groupLabels[groupBy]}`}
+                <ChevronDown className="ml-1.5 h-3 w-3" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end">
+            {(Object.keys(groupLabels) as GroupField[]).map((field) => (
+              <DropdownMenuItem
+                key={field}
+                onClick={() => setGroupBy(field)}
+                className={groupBy === field ? "bg-accent" : ""}
+              >
+                {groupLabels[field]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="rounded-lg border border-border">
@@ -236,23 +294,27 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
           </TableHeader>
           <TableBody>
             {sorted.map((kw) => {
-              const compKey = kw.competition?.toLowerCase() ?? "unknown"
+              const groupKey =
+                groupBy !== "none" ? getGroupKey(kw, groupBy) : null
               const showGroupHeader =
-                groupByCompetition && compKey !== lastCompetition
-              if (groupByCompetition) lastCompetition = compKey
+                groupKey !== null && groupKey !== lastGroupKey
+              if (groupKey !== null) lastGroupKey = groupKey
 
+              const compKey = kw.competition?.toLowerCase() ?? ""
               const compStyle =
                 competitionConfig[compKey] ?? { className: "text-muted-foreground" }
               const statStyle =
                 statusConfig[kw.status] ?? statusConfig.discovered
+              const intStyle =
+                intentConfig[kw.intent ?? ""] ?? { className: "text-muted-foreground" }
 
               return (
                 <>
                   {showGroupHeader && (
-                    <TableRow key={`group-${compKey}`} className="bg-muted/30">
+                    <TableRow key={`group-${groupKey}`} className="bg-muted/30">
                       <TableCell colSpan={10} className="py-2">
                         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          {compKey} Competition
+                          {groupKey}
                         </span>
                       </TableCell>
                     </TableRow>
@@ -303,8 +365,8 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
                     <TableCell>
                       {kw.intent ? (
                         <Badge
-                          variant={intentColors[kw.intent] ?? "secondary"}
-                          className="text-xs capitalize"
+                          variant="outline"
+                          className={`text-xs capitalize ${intStyle.className}`}
                         >
                           {kw.intent}
                         </Badge>

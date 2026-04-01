@@ -118,6 +118,15 @@ export async function scoreTopKeywords(siteId: string): Promise<StepResult> {
       }
     }
 
+    // Remove unscored keywords (below the top-50 cutoff) — they're just noise
+    await prisma.keyword.deleteMany({
+      where: {
+        siteId,
+        relevanceScore: null,
+        status: "discovered", // don't delete manually approved/rejected ones
+      },
+    })
+
     revalidatePath(`/sites/${site.slug}/research`)
     revalidatePath(`/sites/${site.slug}`)
     revalidatePath("/sites")
