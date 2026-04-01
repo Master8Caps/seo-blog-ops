@@ -10,6 +10,7 @@ import {
   discoverFromSeeds,
   discoverFromSite,
   scoreTopKeywords,
+  selectKeywords,
 } from "@/modules/research/actions/run-research"
 import { getKeywordsForSiteId, getKeywordStats, clearKeywords } from "@/modules/research/actions/get-keywords"
 import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
@@ -84,12 +85,20 @@ export default function ResearchPage() {
       await refreshData()
     }
 
+    // Step 4: AI select best keywords
+    setResearchStep("Selecting best keywords...")
+    const selectResult = await selectKeywords(siteId)
+    if (selectResult.success) {
+      await refreshData()
+    }
+
     // Report errors if both discovery steps failed
     if (!seedResult.success && !siteResult.success) {
       setError(seedResult.error ?? siteResult.error ?? "Research failed")
     } else {
       const scored = scoreResult.success ? scoreResult.keywordsFound : 0
-      setSuccessMsg(`Found ${totalFound} keywords, scored top ${scored}`)
+      const selected = selectResult.success ? selectResult.keywordsFound : 0
+      setSuccessMsg(`Found ${totalFound} keywords, scored ${scored}, selected ${selected}`)
     }
 
     setResearchStep("")
