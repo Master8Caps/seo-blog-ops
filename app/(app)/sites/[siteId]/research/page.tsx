@@ -8,7 +8,11 @@ import Link from "next/link"
 import { buttonVariants } from "@/components/ui/button"
 import { LoadingSpinner } from "@/components/shared/loading-spinner"
 import { KeywordTable } from "@/components/shared/keyword-table"
-import { runResearch } from "@/modules/research/actions/run-research"
+import {
+  discoverFromSeeds,
+  discoverFromSite,
+  scoreTopKeywords,
+} from "@/modules/research/actions/run-research"
 import { getKeywordsForSiteId, getKeywordStats } from "@/modules/research/actions/get-keywords"
 import { getSiteById } from "@/modules/sites/actions/get-sites"
 
@@ -21,6 +25,7 @@ export default function ResearchPage() {
   const [stats, setStats] = useState({ total: 0, approved: 0, discovered: 0 })
   const [loading, setLoading] = useState(true)
   const [researching, setResearching] = useState(false)
+  const [researchStep, setResearchStep] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
@@ -55,17 +60,41 @@ export default function ResearchPage() {
     setResearching(true)
     setError(null)
     setSuccessMsg(null)
+    let totalFound = 0
 
-    const result = await runResearch(siteId)
-
-    if (!result.success) {
-      setError(result.error ?? "Research failed")
-    } else {
-      setSuccessMsg(`Found ${result.keywordsFound} keywords`)
+    // Step 1: Discover from seed keywords
+    setResearchStep("Discovering from seed keywords...")
+    const seedResult = await discoverFromSeeds(siteId)
+    if (seedResult.success) {
+      totalFound += seedResult.keywordsFound
+      await refreshData()
     }
 
+    // Step 2: Discover from site URL
+    setResearchStep("Discovering from site URL...")
+    const siteResult = await discoverFromSite(siteId)
+    if (siteResult.success) {
+      totalFound += siteResult.keywordsFound
+      await refreshData()
+    }
+
+    // Step 3: AI scoring on top keywords
+    setResearchStep("Scoring top keywords with AI...")
+    const scoreResult = await scoreTopKeywords(siteId)
+    if (scoreResult.success) {
+      await refreshData()
+    }
+
+    // Report errors if both discovery steps failed
+    if (!seedResult.success && !siteResult.success) {
+      setError(seedResult.error ?? siteResult.error ?? "Research failed")
+    } else {
+      const scored = scoreResult.success ? scoreResult.keywordsFound : 0
+      setSuccessMsg(`Found ${totalFound} keywords, scored top ${scored}`)
+    }
+
+    setResearchStep("")
     setResearching(false)
-    await refreshData()
   }
 
   if (loading) {
@@ -95,7 +124,7 @@ export default function ResearchPage() {
           {researching ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Researching...
+              {researchStep || "Researching..."}
             </>
           ) : (
             <>
