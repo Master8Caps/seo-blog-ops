@@ -3,9 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Search, Loader2, RefreshCw } from "lucide-react"
-import Link from "next/link"
-import { buttonVariants } from "@/components/ui/button"
+import { Search, Loader2, RefreshCw } from "lucide-react"
 import { LoadingSpinner } from "@/components/shared/loading-spinner"
 import { KeywordTable } from "@/components/shared/keyword-table"
 import {
@@ -21,7 +19,6 @@ export default function ResearchPage() {
   const siteSlug = params.siteSlug as string
 
   const [siteId, setSiteId] = useState("")
-  const [siteName, setSiteName] = useState("")
   const [keywords, setKeywords] = useState<Awaited<ReturnType<typeof getKeywordsForSiteId>>>([])
   const [stats, setStats] = useState({ total: 0, approved: 0, discovered: 0 })
   const [loading, setLoading] = useState(true)
@@ -47,7 +44,6 @@ export default function ResearchPage() {
       const site = await getSiteBySlug(siteSlug)
       if (!site) return
       setSiteId(site.id)
-      setSiteName(site.name)
       const [kws, kwStats] = await Promise.all([
         getKeywordsForSiteId(site.id),
         getKeywordStats(site.id),
@@ -106,20 +102,9 @@ export default function ResearchPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link
-          href={`/sites/${siteSlug}`}
-          className={buttonVariants({ variant: "ghost", size: "icon" })}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold tracking-tight">
-            Keyword Research
-          </h1>
-          <p className="text-sm text-muted-foreground">{siteName}</p>
-        </div>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between">
+        <div />
         <Button
           onClick={handleRunResearch}
           disabled={researching}

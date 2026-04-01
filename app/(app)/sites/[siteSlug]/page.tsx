@@ -1,5 +1,3 @@
-import { notFound } from "next/navigation"
-import { Badge } from "@/components/ui/badge"
 import {
   Globe,
   Users,
@@ -7,12 +5,10 @@ import {
   Tag,
   FileText,
   Search,
-  ArrowLeft,
-  Pencil,
 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
-import { LinkButton } from "@/components/shared/link-button"
-import { SiteFavicon } from "@/components/shared/site-favicon"
+import { notFound } from "next/navigation"
 import type { SiteProfile } from "@/modules/sites/types"
 
 export default async function SiteDetailPage({
@@ -30,29 +26,6 @@ export default async function SiteDetailPage({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <LinkButton href="/sites" variant="ghost" size="icon">
-          <ArrowLeft className="h-4 w-4" />
-        </LinkButton>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <SiteFavicon url={site.url} size={40} className="shrink-0 rounded-md" />
-            <h1 className="text-3xl font-bold tracking-tight">{site.name}</h1>
-            {site.autopilot && (
-              <Badge variant="outline">Autopilot</Badge>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground">{site.url}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <LinkButton href={`/sites/${siteSlug}/edit`} variant="outline" size="sm">
-            <Pencil className="mr-2 h-3.5 w-3.5" />
-            Edit
-          </LinkButton>
-        </div>
-      </div>
-
       {site.description && (
         <p className="text-muted-foreground">{site.description}</p>
       )}
@@ -165,18 +138,6 @@ export default async function SiteDetailPage({
           )}
         </div>
       )}
-
-      {/* Quick Links */}
-      <div className="flex gap-3">
-        <LinkButton href={`/sites/${siteSlug}/research`} variant="outline">
-          <Search className="mr-2 h-4 w-4" />
-          Keyword Research
-        </LinkButton>
-        <LinkButton href={`/sites/${siteSlug}/content`} variant="outline">
-          <FileText className="mr-2 h-4 w-4" />
-          Content
-        </LinkButton>
-      </div>
     </div>
   )
 }

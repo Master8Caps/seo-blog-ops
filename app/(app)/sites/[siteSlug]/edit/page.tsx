@@ -93,15 +93,6 @@ export default function EditSitePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center gap-4">
-        <Link
-          href={`/sites/${siteSlug}`}
-          className={buttonVariants({ variant: "ghost", size: "icon" })}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <h1 className="text-3xl font-bold tracking-tight">Edit Site</h1>
-      </div>
 
       <Card>
         <form onSubmit={handleSave}>
