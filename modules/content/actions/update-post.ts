@@ -31,6 +31,18 @@ export async function approvePost(postId: string, approvedBy: string) {
   return post
 }
 
+export async function deletePost(postId: string) {
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    include: { site: { select: { slug: true } } },
+  })
+  if (!post) return
+
+  await prisma.post.delete({ where: { id: postId } })
+  revalidatePath(`/sites/${post.site.slug}/content`)
+  revalidatePath("/content")
+}
+
 export async function rejectPost(postId: string, reviewNotes: string) {
   const post = await prisma.post.update({
     where: { id: postId },

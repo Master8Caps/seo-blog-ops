@@ -10,6 +10,7 @@ import {
   X,
   Save,
   Loader2,
+  Trash2,
 } from "lucide-react"
 import Link from "next/link"
 import { buttonVariants } from "@/components/ui/button"
@@ -19,6 +20,7 @@ import {
   updatePostContent,
   approvePost,
   rejectPost,
+  deletePost,
 } from "@/modules/content/actions/update-post"
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -139,6 +141,21 @@ export default function PostDetailPage() {
             </Button>
           </>
         )}
+        <div className="ml-auto">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-destructive hover:text-destructive"
+            onClick={async () => {
+              if (!confirm("Delete this post? This cannot be undone.")) return
+              await deletePost(postId)
+              router.push("/content")
+            }}
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            Delete
+          </Button>
+        </div>
       </div>
 
       {/* Reject notes input */}
