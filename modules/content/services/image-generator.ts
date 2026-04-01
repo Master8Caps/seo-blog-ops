@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai"
-import { createSupabaseServerClient } from "@/lib/auth/supabase-server"
+import { createClient } from "@supabase/supabase-js"
 
 export interface ImagePrompt {
   section: string
@@ -10,6 +10,14 @@ export interface GeneratedImage {
   section: string
   url: string
   alt: string
+}
+
+/** Create a Supabase client for storage (doesn't need cookies/auth context) */
+function createStorageClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 }
 
 /**
@@ -26,27 +34,24 @@ export async function generateAndUploadImages(
   }
 
   const ai = new GoogleGenAI({ apiKey })
-  const supabase = await createSupabaseServerClient()
+  const supabase = createStorageClient()
   const images: GeneratedImage[] = []
 
   for (const { section, prompt } of imagePrompts) {
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3-pro-image-preview",
+        model: "gemini-2.0-flash-exp",
         contents: `Generate a professional, high-quality blog image: ${prompt}. Style: clean, modern, suitable for a professional blog post. No text overlays.`,
         config: {
           responseModalities: ["IMAGE"],
-          imageConfig: {
-            aspectRatio: "16:9",
-            imageSize: "1K",
-          },
         },
       })
 
       // Extract image data from response
-      const imagePart = response.candidates?.[0]?.content?.parts?.find(
-        (p: { inlineData?: unknown }) => p.inlineData
-      ) as { inlineData: { data: string; mimeType: string } } | undefined
+      const parts = response.candidates?.[0]?.content?.parts ?? []
+      const imagePart = parts.find(
+        (p) => p.inlineData?.mimeType?.startsWith("image/")
+      )
 
       if (!imagePart?.inlineData) {
         console.error(`No image generated for section: ${section}`)
@@ -54,13 +59,14 @@ export async function generateAndUploadImages(
       }
 
       // Upload to Supabase Storage
-      const buffer = Buffer.from(imagePart.inlineData.data, "base64")
-      const filePath = `posts/${postId}/${section}.png`
+      const buffer = Buffer.from(imagePart.inlineData.data!, "base64")
+      const ext = imagePart.inlineData.mimeType === "image/webp" ? "webp" : "png"
+      const filePath = `posts/${postId}/${section}.${ext}`
 
       const { error: uploadError } = await supabase.storage
         .from("post-images")
         .upload(filePath, buffer, {
-          contentType: "image/png",
+          contentType: imagePart.inlineData.mimeType ?? "image/png",
           upsert: true,
         })
 
