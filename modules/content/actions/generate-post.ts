@@ -10,6 +10,7 @@ import {
   type BlogGenerationResult,
   type KeywordForBlog,
 } from "@/lib/ai/prompts/blog-generation"
+import { parseAIJson } from "@/lib/ai/parse-json"
 import { humanizeContent } from "../services/humanizer"
 import {
   generateAndUploadImages,
@@ -74,7 +75,7 @@ export async function generatePost(
         return { success: false, error: "AI keyword selection failed" }
       }
 
-      const selection = JSON.parse(selectionText.text) as KeywordGroupSelectionResult
+      const selection = parseAIJson<KeywordGroupSelectionResult>(selectionText.text) as KeywordGroupSelectionResult
 
       // Match selected keywords back to DB records
       const primaryMatch = approvedKeywords.find(
@@ -117,7 +118,7 @@ export async function generatePost(
       return { success: false, error: "No response from Claude" }
     }
 
-    const blog = JSON.parse(textBlock.text) as BlogGenerationResult
+    const blog = parseAIJson<BlogGenerationResult>(textBlock.text) as BlogGenerationResult
 
     // Step 3: Create post record (linked to primary keyword)
     const post = await prisma.post.create({

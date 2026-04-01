@@ -1,4 +1,5 @@
 import { anthropic } from "@/lib/ai/client"
+import { parseAIJson } from "@/lib/ai/parse-json"
 import {
   buildSiteAnalysisPrompt,
   type SiteAnalysisInput,
@@ -22,7 +23,7 @@ export async function analyzeSite(
   }
 
   try {
-    const result = JSON.parse(textBlock.text) as SiteAnalysisResult
+    const result = parseAIJson<SiteAnalysisResult>(textBlock.text)
     if (!result.niche || !result.audience || !result.topics) {
       throw new Error("Incomplete analysis result")
     }

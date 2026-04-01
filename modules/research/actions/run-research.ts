@@ -9,6 +9,7 @@ import {
 } from "@/lib/seo/client"
 import { scoreKeywordRelevance } from "../services/relevance-scorer"
 import type { SiteProfile } from "@/modules/sites/types"
+import { parseAIJson } from "@/lib/ai/parse-json"
 import { anthropic } from "@/lib/ai/client"
 import {
   buildKeywordSelectionPrompt,
@@ -189,7 +190,7 @@ export async function selectKeywords(siteId: string): Promise<StepResult> {
       return { success: false, keywordsFound: 0, error: "No response from AI" }
     }
 
-    const result = JSON.parse(textBlock.text) as KeywordSelectionResult
+    const result = parseAIJson<KeywordSelectionResult>(textBlock.text)
     const selectedSet = new Set(result.selected.map((s) => s.toLowerCase()))
 
     let approved = 0

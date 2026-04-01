@@ -1,4 +1,5 @@
 import { anthropic } from "@/lib/ai/client"
+import { parseAIJson } from "@/lib/ai/parse-json"
 import {
   buildRelevanceScoringPrompt,
   type RelevanceScoringInput,
@@ -29,7 +30,7 @@ export async function scoreKeywordRelevance(
     if (!textBlock || textBlock.type !== "text") continue
 
     try {
-      const result = JSON.parse(textBlock.text) as RelevanceScoringResult
+      const result = parseAIJson<RelevanceScoringResult>(textBlock.text)
       allScores.push(...result.scores)
     } catch {
       // If a batch fails to parse, assign default scores
