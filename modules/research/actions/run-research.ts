@@ -9,6 +9,11 @@ import {
 } from "@/lib/seo/client"
 import { scoreKeywordRelevance } from "../services/relevance-scorer"
 import type { SiteProfile } from "@/modules/sites/types"
+import { anthropic } from "@/lib/ai/client"
+import {
+  buildKeywordSelectionPrompt,
+  type KeywordSelectionResult,
+} from "@/lib/ai/prompts/keyword-selection"
 
 const TOP_KEYWORDS_LIMIT = 50
 
@@ -136,6 +141,77 @@ export async function scoreTopKeywords(siteId: string): Promise<StepResult> {
       success: false,
       keywordsFound: 0,
       error: `AI scoring failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+    }
+  }
+}
+
+/**
+ * Step 4: AI selects the best ~15 keywords and auto-approves them
+ */
+export async function selectKeywords(siteId: string): Promise<StepResult> {
+  const site = await prisma.site.findUnique({ where: { id: siteId } })
+  if (!site) return { success: false, keywordsFound: 0, error: "Site not found" }
+
+  try {
+    const scored = await prisma.keyword.findMany({
+      where: { siteId, relevanceScore: { not: null } },
+      orderBy: { relevanceScore: "desc" },
+    })
+
+    if (scored.length === 0) {
+      return { success: true, keywordsFound: 0 }
+    }
+
+    const prompt = buildKeywordSelectionPrompt({
+      siteNiche: site.niche ?? "unknown",
+      siteAudience: site.audience ?? "unknown",
+      siteTone: site.tone ?? "neutral",
+      siteTopics: (site.topics as string[]) ?? [],
+      keywords: scored.map((k) => ({
+        keyword: k.keyword,
+        searchVolume: k.searchVolume,
+        cpc: k.cpc,
+        competition: k.competition,
+        relevanceScore: k.relevanceScore,
+        intent: k.intent,
+        cluster: k.cluster,
+      })),
+    })
+
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2000,
+      messages: [{ role: "user", content: prompt }],
+    })
+
+    const textBlock = message.content.find((block) => block.type === "text")
+    if (!textBlock || textBlock.type !== "text") {
+      return { success: false, keywordsFound: 0, error: "No response from AI" }
+    }
+
+    const result = JSON.parse(textBlock.text) as KeywordSelectionResult
+    const selectedSet = new Set(result.selected.map((s) => s.toLowerCase()))
+
+    let approved = 0
+    for (const kw of scored) {
+      if (selectedSet.has(kw.keyword.toLowerCase())) {
+        await prisma.keyword.update({
+          where: { id: kw.id },
+          data: { status: "approved", aiSelected: true },
+        })
+        approved++
+      }
+    }
+
+    revalidatePath(`/sites/${site.slug}/research`)
+    revalidatePath(`/sites/${site.slug}`)
+    revalidatePath("/sites")
+    return { success: true, keywordsFound: approved }
+  } catch (error) {
+    return {
+      success: false,
+      keywordsFound: 0,
+      error: `AI selection failed: ${error instanceof Error ? error.message : "Unknown error"}`,
     }
   }
 }
