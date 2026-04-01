@@ -15,7 +15,7 @@ import {
 import { ArrowLeft, Save } from "lucide-react"
 import Link from "next/link"
 import { buttonVariants } from "@/components/ui/button"
-import { getSiteById } from "@/modules/sites/actions/get-sites"
+import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
 import { updateSite } from "@/modules/sites/actions/update-site"
 import { deleteSite } from "@/modules/sites/actions/delete-site"
 import { LoadingSpinner } from "@/components/shared/loading-spinner"
@@ -23,8 +23,9 @@ import { LoadingSpinner } from "@/components/shared/loading-spinner"
 export default function EditSitePage() {
   const router = useRouter()
   const params = useParams()
-  const siteId = params.siteId as string
+  const siteSlug = params.siteSlug as string
 
+  const [siteId, setSiteId] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,11 +38,12 @@ export default function EditSitePage() {
 
   useEffect(() => {
     async function load() {
-      const site = await getSiteById(siteId)
+      const site = await getSiteBySlug(siteSlug)
       if (!site) {
         router.push("/sites")
         return
       }
+      setSiteId(site.id)
       setName(site.name)
       setDescription(site.description ?? "")
       setNiche(site.niche ?? "")
@@ -51,7 +53,7 @@ export default function EditSitePage() {
       setLoading(false)
     }
     load()
-  }, [siteId, router])
+  }, [siteSlug, router])
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -71,7 +73,7 @@ export default function EditSitePage() {
           : undefined,
         onboardingStatus: "ready",
       })
-      router.push(`/sites/${siteId}`)
+      router.push(`/sites/${siteSlug}`)
     } catch {
       setError("Failed to save changes")
       setSaving(false)
@@ -93,7 +95,7 @@ export default function EditSitePage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center gap-4">
         <Link
-          href={`/sites/${siteId}`}
+          href={`/sites/${siteSlug}`}
           className={buttonVariants({ variant: "ghost", size: "icon" })}
         >
           <ArrowLeft className="h-4 w-4" />

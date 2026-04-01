@@ -23,6 +23,7 @@ export default function NewSitePage() {
   const [description, setDescription] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [siteId, setSiteId] = useState<string | null>(null)
+  const [siteSlug, setSiteSlug] = useState<string | null>(null)
   const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
@@ -36,6 +37,7 @@ export default function NewSitePage() {
     }
 
     setSiteId(createResult.siteId)
+    setSiteSlug(createResult.siteSlug ?? null)
     setStep("crawling")
 
     // crawlAndAnalyzeSite does both crawl + AI analysis in one call.
@@ -92,7 +94,7 @@ export default function NewSitePage() {
     )
   }
 
-  if (step === "complete" && siteId) {
+  if (step === "complete" && siteSlug) {
     return (
       <div className="mx-auto max-w-lg">
         <Card>
@@ -106,7 +108,7 @@ export default function NewSitePage() {
               Review and edit the profile to fine-tune it.
             </p>
             <div className="mt-6 flex justify-center gap-3">
-              <Button onClick={() => router.push(`/sites/${siteId}`)}>
+              <Button onClick={() => router.push(`/sites/${siteSlug}`)}>
                 View SEO Profile
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

@@ -23,7 +23,7 @@ export async function updateSite(input: UpdateSiteInput) {
     data,
   })
 
-  revalidatePath(`/sites/${id}`)
+  revalidatePath(`/sites/${site.slug}`)
   revalidatePath("/sites")
   return site
 }

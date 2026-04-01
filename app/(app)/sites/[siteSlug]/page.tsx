@@ -10,7 +10,7 @@ import {
   ArrowLeft,
   Pencil,
 } from "lucide-react"
-import { getSiteById } from "@/modules/sites/actions/get-sites"
+import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
 import { LinkButton } from "@/components/shared/link-button"
 import { SiteFavicon } from "@/components/shared/site-favicon"
 import type { SiteProfile } from "@/modules/sites/types"
@@ -18,10 +18,10 @@ import type { SiteProfile } from "@/modules/sites/types"
 export default async function SiteDetailPage({
   params,
 }: {
-  params: Promise<{ siteId: string }>
+  params: Promise<{ siteSlug: string }>
 }) {
-  const { siteId } = await params
-  const site = await getSiteById(siteId)
+  const { siteSlug } = await params
+  const site = await getSiteBySlug(siteSlug)
 
   if (!site) notFound()
 
@@ -46,7 +46,7 @@ export default async function SiteDetailPage({
           <p className="text-sm text-muted-foreground">{site.url}</p>
         </div>
         <div className="flex items-center gap-2">
-          <LinkButton href={`/sites/${siteId}/edit`} variant="outline" size="sm">
+          <LinkButton href={`/sites/${siteSlug}/edit`} variant="outline" size="sm">
             <Pencil className="mr-2 h-3.5 w-3.5" />
             Edit
           </LinkButton>
@@ -168,11 +168,11 @@ export default async function SiteDetailPage({
 
       {/* Quick Links */}
       <div className="flex gap-3">
-        <LinkButton href={`/sites/${siteId}/research`} variant="outline">
+        <LinkButton href={`/sites/${siteSlug}/research`} variant="outline">
           <Search className="mr-2 h-4 w-4" />
           Keyword Research
         </LinkButton>
-        <LinkButton href={`/sites/${siteId}/content`} variant="outline">
+        <LinkButton href={`/sites/${siteSlug}/content`} variant="outline">
           <FileText className="mr-2 h-4 w-4" />
           Content
         </LinkButton>

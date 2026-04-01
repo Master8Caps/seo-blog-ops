@@ -14,12 +14,13 @@ import {
   scoreTopKeywords,
 } from "@/modules/research/actions/run-research"
 import { getKeywordsForSiteId, getKeywordStats } from "@/modules/research/actions/get-keywords"
-import { getSiteById } from "@/modules/sites/actions/get-sites"
+import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
 
 export default function ResearchPage() {
   const params = useParams()
-  const siteId = params.siteId as string
+  const siteSlug = params.siteSlug as string
 
+  const [siteId, setSiteId] = useState("")
   const [siteName, setSiteName] = useState("")
   const [keywords, setKeywords] = useState<Awaited<ReturnType<typeof getKeywordsForSiteId>>>([])
   const [stats, setStats] = useState({ total: 0, approved: 0, discovered: 0 })
@@ -29,13 +30,13 @@ export default function ResearchPage() {
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  async function refreshData() {
-    const [site, kws, kwStats] = await Promise.all([
-      getSiteById(siteId),
-      getKeywordsForSiteId(siteId),
-      getKeywordStats(siteId),
+  async function refreshData(id?: string) {
+    const resolvedId = id ?? siteId
+    if (!resolvedId) return
+    const [kws, kwStats] = await Promise.all([
+      getKeywordsForSiteId(resolvedId),
+      getKeywordStats(resolvedId),
     ])
-    if (site) setSiteName(site.name)
     setKeywords(kws)
     setStats(kwStats)
     setLoading(false)
@@ -43,18 +44,20 @@ export default function ResearchPage() {
 
   useEffect(() => {
     async function loadData() {
-      const [site, kws, kwStats] = await Promise.all([
-        getSiteById(siteId),
-        getKeywordsForSiteId(siteId),
-        getKeywordStats(siteId),
+      const site = await getSiteBySlug(siteSlug)
+      if (!site) return
+      setSiteId(site.id)
+      setSiteName(site.name)
+      const [kws, kwStats] = await Promise.all([
+        getKeywordsForSiteId(site.id),
+        getKeywordStats(site.id),
       ])
-      if (site) setSiteName(site.name)
       setKeywords(kws)
       setStats(kwStats)
       setLoading(false)
     }
     loadData()
-  }, [siteId])
+  }, [siteSlug])
 
   async function handleRunResearch() {
     setResearching(true)
@@ -106,7 +109,7 @@ export default function ResearchPage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link
-          href={`/sites/${siteId}`}
+          href={`/sites/${siteSlug}`}
           className={buttonVariants({ variant: "ghost", size: "icon" })}
         >
           <ArrowLeft className="h-4 w-4" />

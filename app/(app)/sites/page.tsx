@@ -38,7 +38,7 @@ export default async function SitesPage() {
           {sites.map((site) => (
             <SiteCard
               key={site.id}
-              id={site.id}
+              slug={site.slug}
               name={site.name}
               url={site.url}
               niche={site.niche}

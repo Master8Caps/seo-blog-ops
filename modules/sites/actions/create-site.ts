@@ -5,10 +5,12 @@ import { prisma } from "@/lib/db/prisma"
 import { createSiteSchema, type CreateSiteInput } from "../schemas"
 import { crawlSite } from "../services/crawler"
 import { analyzeSite } from "../services/analyzer"
+import { slugFromUrl } from "@/lib/utils/slug"
 
 interface CreateSiteResult {
   success: boolean
   siteId?: string
+  siteSlug?: string
   error?: string
 }
 
@@ -27,17 +29,29 @@ export async function createSite(
     return { success: false, error: "A site with this URL already exists" }
   }
 
+  // Generate slug from URL, handle conflicts by appending a number
+  let slug = slugFromUrl(url)
+  const existingSlug = await prisma.site.findUnique({ where: { slug } })
+  if (existingSlug) {
+    let counter = 2
+    while (await prisma.site.findUnique({ where: { slug: `${slug}-${counter}` } })) {
+      counter++
+    }
+    slug = `${slug}-${counter}`
+  }
+
   const site = await prisma.site.create({
     data: {
       url,
       name,
+      slug,
       description,
       onboardingStatus: "pending",
     },
   })
 
   revalidatePath("/sites")
-  return { success: true, siteId: site.id }
+  return { success: true, siteId: site.id, siteSlug: site.slug }
 }
 
 export async function crawlAndAnalyzeSite(
@@ -86,9 +100,9 @@ export async function crawlAndAnalyzeSite(
       },
     })
 
-    revalidatePath(`/sites/${siteId}`)
+    revalidatePath(`/sites/${site.slug}`)
     revalidatePath("/sites")
-    return { success: true, siteId }
+    return { success: true, siteId, siteSlug: site.slug }
   } catch (error) {
     await prisma.site.update({
       where: { id: siteId },

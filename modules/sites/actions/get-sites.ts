@@ -23,3 +23,14 @@ export async function getSiteById(id: string) {
     },
   })
 }
+
+export async function getSiteBySlug(slug: string) {
+  return prisma.site.findUnique({
+    where: { slug },
+    include: {
+      _count: {
+        select: { posts: true, keywords: true },
+      },
+    },
+  })
+}

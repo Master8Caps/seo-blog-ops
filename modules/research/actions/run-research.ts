@@ -40,7 +40,7 @@ export async function discoverFromSeeds(siteId: string): Promise<StepResult> {
   try {
     const results = await getKeywordsForKeywords(seedKeywords)
     const saved = await saveKeywords(siteId, results)
-    revalidatePath(`/sites/${siteId}/research`)
+    revalidatePath(`/sites/${site.slug}/research`)
     return { success: true, keywordsFound: saved }
   } catch (error) {
     return {
@@ -62,7 +62,7 @@ export async function discoverFromSite(siteId: string): Promise<StepResult> {
   try {
     const results = await getKeywordsForSite(site.url)
     const saved = await saveKeywords(siteId, results)
-    revalidatePath(`/sites/${siteId}/research`)
+    revalidatePath(`/sites/${site.slug}/research`)
     return { success: true, keywordsFound: saved }
   } catch (error) {
     return {
@@ -118,8 +118,8 @@ export async function scoreTopKeywords(siteId: string): Promise<StepResult> {
       }
     }
 
-    revalidatePath(`/sites/${siteId}/research`)
-    revalidatePath(`/sites/${siteId}`)
+    revalidatePath(`/sites/${site.slug}/research`)
+    revalidatePath(`/sites/${site.slug}`)
     revalidatePath("/sites")
     return { success: true, keywordsFound: unscored.length }
   } catch (error) {

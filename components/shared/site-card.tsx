@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { SiteFavicon } from "@/components/shared/site-favicon"
 
 interface SiteCardProps {
-  id: string
+  slug: string
   name: string
   url: string
   niche?: string | null
@@ -22,7 +22,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 }
 
 export function SiteCard({
-  id,
+  slug,
   name,
   url,
   niche,
@@ -35,7 +35,7 @@ export function SiteCard({
 
   return (
     <Link
-      href={`/sites/${id}`}
+      href={`/sites/${slug}`}
       className="group block rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/50"
     >
       <div className="flex items-start justify-between">

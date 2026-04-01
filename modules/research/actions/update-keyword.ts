@@ -10,8 +10,9 @@ export async function updateKeywordStatus(
   const keyword = await prisma.keyword.update({
     where: { id: keywordId },
     data: { status },
+    include: { site: { select: { slug: true } } },
   })
-  revalidatePath(`/sites/${keyword.siteId}/research`)
+  revalidatePath(`/sites/${keyword.site.slug}/research`)
   return keyword
 }
 
@@ -23,7 +24,7 @@ export async function bulkUpdateKeywordStatus(
 
   const first = await prisma.keyword.findFirst({
     where: { id: keywordIds[0] },
-    select: { siteId: true },
+    include: { site: { select: { slug: true } } },
   })
 
   await prisma.keyword.updateMany({
@@ -32,6 +33,6 @@ export async function bulkUpdateKeywordStatus(
   })
 
   if (first) {
-    revalidatePath(`/sites/${first.siteId}/research`)
+    revalidatePath(`/sites/${first.site.slug}/research`)
   }
 }

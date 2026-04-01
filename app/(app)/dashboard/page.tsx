@@ -153,7 +153,7 @@ export default async function DashboardPage() {
                   return (
                     <Link
                       key={site.id}
-                      href={`/sites/${site.id}`}
+                      href={`/sites/${site.slug}`}
                       className="flex items-center justify-between rounded-md px-3 py-2 -mx-3 hover:bg-accent transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0">

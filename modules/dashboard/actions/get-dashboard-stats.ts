@@ -22,6 +22,7 @@ export interface DashboardStats {
   autopilotActive: number
   recentSites: {
     id: string
+    slug: string
     name: string
     url: string
     onboardingStatus: string
@@ -64,6 +65,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
+        slug: true,
         name: true,
         url: true,
         onboardingStatus: true,
