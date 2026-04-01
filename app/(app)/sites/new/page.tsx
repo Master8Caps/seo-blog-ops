@@ -38,8 +38,13 @@ export default function NewSitePage() {
     setSiteId(createResult.siteId)
     setStep("crawling")
 
-    setStep("analyzing")
+    // crawlAndAnalyzeSite does both crawl + AI analysis in one call.
+    // Show "analyzing" after a few seconds to reflect the typical crawl duration.
+    const analyzeTimer = setTimeout(() => setStep("analyzing"), 4000)
+
     const analyzeResult = await crawlAndAnalyzeSite(createResult.siteId)
+    clearTimeout(analyzeTimer)
+
     if (!analyzeResult.success) {
       setError(analyzeResult.error ?? "Analysis failed")
       setStep("details")
