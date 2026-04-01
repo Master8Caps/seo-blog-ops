@@ -37,9 +37,7 @@ export default async function SiteDetailPage({
         </LinkButton>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10">
-              <SiteFavicon url={site.url} size={24} />
-            </div>
+            <SiteFavicon url={site.url} size={40} className="shrink-0 rounded-md" />
             <h1 className="text-3xl font-bold tracking-tight">{site.name}</h1>
             {site.autopilot && (
               <Badge variant="outline">Autopilot</Badge>

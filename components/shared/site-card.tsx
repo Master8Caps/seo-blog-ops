@@ -40,9 +40,7 @@ export function SiteCard({
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-            <SiteFavicon url={url} size={20} />
-          </div>
+          <SiteFavicon url={url} size={40} className="rounded-md" />
           <div>
             <h3 className="font-semibold group-hover:text-primary transition-colors">
               {name}

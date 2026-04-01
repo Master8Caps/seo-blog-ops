@@ -157,9 +157,7 @@ export default async function DashboardPage() {
                       className="flex items-center justify-between rounded-md px-3 py-2 -mx-3 hover:bg-accent transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
-                          <SiteFavicon url={site.url} size={16} />
-                        </div>
+                        <SiteFavicon url={site.url} size={32} className="shrink-0 rounded-md" />
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">
                             {site.name}
