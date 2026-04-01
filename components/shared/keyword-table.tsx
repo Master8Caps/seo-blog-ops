@@ -210,9 +210,152 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
     setUpdating(null)
   }
 
-  let lastGroupKey: string | null = null
-  let shownApprovedHeader = false
-  let shownOtherHeader = false
+  function renderTableHeader() {
+    return (
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-10">
+            <Checkbox
+              checked={selected.size === sorted.length && sorted.length > 0}
+              onCheckedChange={toggleSelectAll}
+            />
+          </TableHead>
+          <TableHead>
+            <SortButton field="keyword" onSort={handleSort}>Keyword</SortButton>
+          </TableHead>
+          <TableHead className="text-right">
+            <SortButton field="searchVolume" onSort={handleSort}>Volume</SortButton>
+          </TableHead>
+          <TableHead className="text-right">
+            <SortButton field="cpc" onSort={handleSort}>CPC</SortButton>
+          </TableHead>
+          <TableHead>Competition</TableHead>
+          <TableHead className="text-right">
+            <SortButton field="relevanceScore" onSort={handleSort}>Relevance</SortButton>
+          </TableHead>
+          <TableHead>Intent</TableHead>
+          <TableHead>Cluster</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead className="w-24">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+    )
+  }
+
+  function renderRow(kw: KeywordRow) {
+    const compKey = kw.competition?.toLowerCase() ?? ""
+    const compStyle = competitionConfig[compKey] ?? { className: "text-muted-foreground" }
+    const statStyle = statusConfig[kw.status] ?? statusConfig.discovered
+    const intStyle = intentConfig[kw.intent ?? ""] ?? { className: "text-muted-foreground" }
+
+    return (
+      <TableRow key={kw.id}>
+        <TableCell>
+          <Checkbox
+            checked={selected.has(kw.id)}
+            onCheckedChange={() => toggleSelect(kw.id)}
+          />
+        </TableCell>
+        <TableCell className="font-medium">{kw.keyword}</TableCell>
+        <TableCell className="text-right">
+          {kw.searchVolume?.toLocaleString() ?? "—"}
+        </TableCell>
+        <TableCell className="text-right">
+          {kw.cpc != null ? `$${kw.cpc.toFixed(2)}` : "—"}
+        </TableCell>
+        <TableCell>
+          {kw.competition ? (
+            <Badge variant="outline" className={`text-xs capitalize ${compStyle.className}`}>
+              {kw.competition.toLowerCase()}
+            </Badge>
+          ) : "—"}
+        </TableCell>
+        <TableCell className="text-right">
+          {kw.relevanceScore != null ? (
+            <span className={
+              kw.relevanceScore >= 0.8 ? "text-green-400"
+                : kw.relevanceScore >= 0.5 ? "text-yellow-400"
+                  : "text-muted-foreground"
+            }>
+              {(kw.relevanceScore * 100).toFixed(0)}%
+            </span>
+          ) : "—"}
+        </TableCell>
+        <TableCell>
+          {kw.intent ? (
+            <Badge variant="outline" className={`text-xs capitalize ${intStyle.className}`}>
+              {kw.intent}
+            </Badge>
+          ) : "—"}
+        </TableCell>
+        <TableCell className="text-xs text-muted-foreground">
+          {kw.cluster ?? "—"}
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-1.5">
+            <Badge variant="outline" className={`text-xs capitalize ${statStyle.className}`}>
+              {kw.status}
+            </Badge>
+            {kw.aiSelected && (
+              <span className="flex items-center gap-0.5 text-xs text-amber-400" title="AI Pick">
+                <Sparkles className="h-3 w-3" />
+              </span>
+            )}
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex gap-1">
+            {kw.status !== "approved" && (
+              <button
+                onClick={() => handleStatusChange(kw.id, "approved")}
+                disabled={updating === kw.id}
+                className="rounded p-1 hover:bg-primary/10 text-primary transition-colors"
+                title="Approve"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+            )}
+            {kw.status !== "rejected" && (
+              <button
+                onClick={() => handleStatusChange(kw.id, "rejected")}
+                disabled={updating === kw.id}
+                className="rounded p-1 hover:bg-destructive/10 text-destructive transition-colors"
+                title="Reject"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </TableCell>
+      </TableRow>
+    )
+  }
+
+  function renderGroupedRows(items: KeywordRow[], skipStatusGroup: boolean) {
+    let lastGroup: string | null = null
+    return items.map((kw) => {
+      // Skip group headers for "status" grouping when in the approved section
+      const effectiveGroupBy = (skipStatusGroup && groupBy === "status") ? "none" : groupBy
+      const groupKey = effectiveGroupBy !== "none" ? getGroupKey(kw, effectiveGroupBy) : null
+      const showGroupHeader = groupKey !== null && groupKey !== lastGroup
+      if (groupKey !== null) lastGroup = groupKey
+
+      return (
+        <>
+          {showGroupHeader && (
+            <TableRow key={`group-${groupKey}-${kw.id}`} className="bg-muted/30">
+              <TableCell colSpan={10} className="py-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {groupKey}
+                </span>
+              </TableCell>
+            </TableRow>
+          )}
+          {renderRow(kw)}
+        </>
+      )
+    })
+  }
 
   return (
     <div className="space-y-4">
@@ -271,195 +414,49 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
         </DropdownMenu>
       </div>
 
-      <div className="rounded-lg border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">
-                <Checkbox
-                  checked={
-                    selected.size === sorted.length && sorted.length > 0
-                  }
-                  onCheckedChange={toggleSelectAll}
-                />
-              </TableHead>
-              <TableHead>
-                <SortButton field="keyword" onSort={handleSort}>Keyword</SortButton>
-              </TableHead>
-              <TableHead className="text-right">
-                <SortButton field="searchVolume" onSort={handleSort}>Volume</SortButton>
-              </TableHead>
-              <TableHead className="text-right">
-                <SortButton field="cpc" onSort={handleSort}>CPC</SortButton>
-              </TableHead>
-              <TableHead>Competition</TableHead>
-              <TableHead className="text-right">
-                <SortButton field="relevanceScore" onSort={handleSort}>Relevance</SortButton>
-              </TableHead>
-              <TableHead>Intent</TableHead>
-              <TableHead>Cluster</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-24">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sorted.map((kw) => {
-              const groupKey =
-                groupBy !== "none" ? getGroupKey(kw, groupBy) : null
-              const showGroupHeader =
-                groupKey !== null && groupKey !== lastGroupKey
-              if (groupKey !== null) lastGroupKey = groupKey
+      {/* Approved Section */}
+      {approvedKeywords.length > 0 && (
+        <div>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-sm font-semibold text-green-400">
+              Approved
+            </span>
+            <span className="text-xs text-muted-foreground">
+              ({approvedKeywords.length})
+            </span>
+          </div>
+          <div className="rounded-lg border border-green-500/20 bg-green-500/[0.02]">
+            <Table>
+              {renderTableHeader()}
+              <TableBody>
+                {renderGroupedRows(approvedKeywords, true)}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
 
-              // Section headers for approved vs other
-              const isApproved = kw.status === "approved"
-              let showSectionHeader = false
-              let sectionLabel = ""
-              if (isApproved && !shownApprovedHeader && approvedKeywords.length > 0) {
-                shownApprovedHeader = true
-                showSectionHeader = true
-                sectionLabel = `Approved (${approvedKeywords.length})`
-              } else if (!isApproved && !shownOtherHeader && otherKeywords.length > 0) {
-                shownOtherHeader = true
-                showSectionHeader = true
-                sectionLabel = `Discovered (${otherKeywords.length})`
-              }
-
-              const compKey = kw.competition?.toLowerCase() ?? ""
-              const compStyle =
-                competitionConfig[compKey] ?? { className: "text-muted-foreground" }
-              const statStyle =
-                statusConfig[kw.status] ?? statusConfig.discovered
-              const intStyle =
-                intentConfig[kw.intent ?? ""] ?? { className: "text-muted-foreground" }
-
-              return (
-                <>
-                  {showSectionHeader && (
-                    <TableRow key={`section-${sectionLabel}`} className="bg-muted/50">
-                      <TableCell colSpan={10} className="py-2">
-                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                          {sectionLabel}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {showGroupHeader && (
-                    <TableRow key={`group-${groupKey}`} className="bg-muted/30">
-                      <TableCell colSpan={10} className="py-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          {groupKey}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  <TableRow key={kw.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selected.has(kw.id)}
-                        onCheckedChange={() => toggleSelect(kw.id)}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">{kw.keyword}</TableCell>
-                    <TableCell className="text-right">
-                      {kw.searchVolume?.toLocaleString() ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {kw.cpc != null ? `$${kw.cpc.toFixed(2)}` : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {kw.competition ? (
-                        <Badge
-                          variant="outline"
-                          className={`text-xs capitalize ${compStyle.className}`}
-                        >
-                          {kw.competition.toLowerCase()}
-                        </Badge>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {kw.relevanceScore != null ? (
-                        <span
-                          className={
-                            kw.relevanceScore >= 0.8
-                              ? "text-green-400"
-                              : kw.relevanceScore >= 0.5
-                                ? "text-yellow-400"
-                                : "text-muted-foreground"
-                          }
-                        >
-                          {(kw.relevanceScore * 100).toFixed(0)}%
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {kw.intent ? (
-                        <Badge
-                          variant="outline"
-                          className={`text-xs capitalize ${intStyle.className}`}
-                        >
-                          {kw.intent}
-                        </Badge>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {kw.cluster ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        <Badge
-                          variant="outline"
-                          className={`text-xs capitalize ${statStyle.className}`}
-                        >
-                          {kw.status}
-                        </Badge>
-                        {kw.aiSelected && (
-                          <span className="flex items-center gap-0.5 text-xs text-amber-400" title="AI Pick">
-                            <Sparkles className="h-3 w-3" />
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {kw.status !== "approved" && (
-                          <button
-                            onClick={() =>
-                              handleStatusChange(kw.id, "approved")
-                            }
-                            disabled={updating === kw.id}
-                            className="rounded p-1 hover:bg-primary/10 text-primary transition-colors"
-                            title="Approve"
-                          >
-                            <Check className="h-4 w-4" />
-                          </button>
-                        )}
-                        {kw.status !== "rejected" && (
-                          <button
-                            onClick={() =>
-                              handleStatusChange(kw.id, "rejected")
-                            }
-                            disabled={updating === kw.id}
-                            className="rounded p-1 hover:bg-destructive/10 text-destructive transition-colors"
-                            title="Reject"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                </>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </div>
+      {/* Other Keywords Section */}
+      {otherKeywords.length > 0 && (
+        <div>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">
+              Discovered
+            </span>
+            <span className="text-xs text-muted-foreground">
+              ({otherKeywords.length})
+            </span>
+          </div>
+          <div className="rounded-lg border border-border">
+            <Table>
+              {renderTableHeader()}
+              <TableBody>
+                {renderGroupedRows(otherKeywords, false)}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
