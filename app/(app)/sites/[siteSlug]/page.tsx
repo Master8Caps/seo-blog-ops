@@ -7,6 +7,7 @@ import {
   Search,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { AutopilotToggle } from "@/components/shared/autopilot-toggle"
 import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
 import { notFound } from "next/navigation"
 import type { SiteProfile } from "@/modules/sites/types"
@@ -66,6 +67,11 @@ export default async function SiteDetailPage({
               : "Never"}
           </p>
         </div>
+      </div>
+
+      {/* Autopilot */}
+      <div className="rounded-lg border border-border bg-card p-4">
+        <AutopilotToggle siteId={site.id} initialValue={site.autopilot} />
       </div>
 
       {/* SEO Profile */}
