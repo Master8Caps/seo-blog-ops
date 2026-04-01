@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -12,7 +12,10 @@ import {
 } from "lucide-react"
 import { LoadingSpinner } from "@/components/shared/loading-spinner"
 import { getPosts } from "@/modules/content/actions/get-posts"
-import { generatePost } from "@/modules/content/actions/generate-post"
+import {
+  queuePostGeneration,
+  getJobStatus,
+} from "@/modules/content/actions/queue-generation"
 import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -33,6 +36,13 @@ export default function SiteContentPage() {
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
+  const refreshPosts = useCallback(async (id?: string) => {
+    const resolvedId = id ?? siteId
+    if (!resolvedId) return
+    const updated = await getPosts({ siteId: resolvedId })
+    setPosts(updated)
+  }, [siteId])
+
   useEffect(() => {
     async function loadData() {
       const site = await getSiteBySlug(siteSlug)
@@ -50,17 +60,38 @@ export default function SiteContentPage() {
     setError(null)
     setSuccessMsg(null)
 
-    const result = await generatePost(siteId)
+    const result = await queuePostGeneration(siteId)
 
-    if (result.success) {
-      setSuccessMsg("Post generated successfully! AI selected the best keywords.")
-      const updated = await getPosts({ siteId })
-      setPosts(updated)
-    } else {
-      setError(result.error ?? "Generation failed")
+    if (!result.success || !result.jobId) {
+      setError(result.error ?? "Failed to queue generation")
+      setGenerating(false)
+      return
     }
 
-    setGenerating(false)
+    // Poll for job completion
+    const jobId = result.jobId
+    const poll = setInterval(async () => {
+      const job = await getJobStatus(jobId)
+      if (!job) {
+        clearInterval(poll)
+        setError("Job not found")
+        setGenerating(false)
+        return
+      }
+
+      if (job.status === "completed") {
+        clearInterval(poll)
+        setSuccessMsg("Post generated successfully! AI selected the best keywords.")
+        await refreshPosts()
+        setGenerating(false)
+      } else if (job.status === "failed") {
+        clearInterval(poll)
+        const payload = job.payload as { error?: string } | null
+        setError(payload?.error ?? "Generation failed")
+        setGenerating(false)
+      }
+      // "pending" or "processing" — keep polling
+    }, 3000)
   }
 
   if (loading) {
