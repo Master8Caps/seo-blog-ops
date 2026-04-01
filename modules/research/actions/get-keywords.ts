@@ -31,10 +31,11 @@ export async function clearKeywords(siteId: string) {
 }
 
 export async function getKeywordStats(siteId: string) {
-  const [total, approved, discovered] = await Promise.all([
+  const [total, approved, discovered, aiApproved] = await Promise.all([
     prisma.keyword.count({ where: { siteId } }),
     prisma.keyword.count({ where: { siteId, status: "approved" } }),
     prisma.keyword.count({ where: { siteId, status: "discovered" } }),
+    prisma.keyword.count({ where: { siteId, status: "approved", aiSelected: true } }),
   ])
-  return { total, approved, discovered }
+  return { total, approved, discovered, aiApproved }
 }

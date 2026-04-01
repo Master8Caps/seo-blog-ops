@@ -21,7 +21,7 @@ export default function ResearchPage() {
 
   const [siteId, setSiteId] = useState("")
   const [keywords, setKeywords] = useState<Awaited<ReturnType<typeof getKeywordsForSiteId>>>([])
-  const [stats, setStats] = useState({ total: 0, approved: 0, discovered: 0 })
+  const [stats, setStats] = useState({ total: 0, approved: 0, discovered: 0, aiApproved: 0 })
   const [loading, setLoading] = useState(true)
   const [researching, setResearching] = useState(false)
   const [researchStep, setResearchStep] = useState("")
@@ -172,7 +172,14 @@ export default function ResearchPage() {
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Approved</p>
-          <p className="mt-1 text-2xl font-bold">{stats.approved}</p>
+          <p className="mt-1 text-2xl font-bold">
+            {stats.approved}
+            {stats.aiApproved > 0 && (
+              <span className="ml-2 text-sm font-normal text-amber-400">
+                ({stats.aiApproved} AI)
+              </span>
+            )}
+          </p>
         </div>
       </div>
 
