@@ -74,7 +74,12 @@ export function Sidebar({ userEmail, userName }: SidebarProps) {
         )}
       >
         {/* Logo + Collapse Toggle */}
-        <div className="flex h-14 items-center justify-between border-b border-border px-3">
+        <div className={cn(
+          "border-b border-border",
+          collapsed
+            ? "flex flex-col items-center gap-1 py-2"
+            : "flex h-14 items-center justify-between px-3"
+        )}>
           <Logo collapsed={collapsed} />
           <Button
             variant="ghost"
