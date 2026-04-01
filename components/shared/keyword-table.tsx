@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Check, X, ArrowUpDown, Layers, ChevronDown } from "lucide-react"
+import { Check, X, ArrowUpDown, Layers, ChevronDown, Sparkles } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +57,7 @@ interface KeywordRow {
   intent: string | null
   cluster: string | null
   status: string
+  aiSelected: boolean
 }
 
 interface KeywordTableProps {
@@ -378,12 +379,19 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
                       {kw.cluster ?? "—"}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`text-xs capitalize ${statStyle.className}`}
-                      >
-                        {kw.status}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge
+                          variant="outline"
+                          className={`text-xs capitalize ${statStyle.className}`}
+                        >
+                          {kw.status}
+                        </Badge>
+                        {kw.aiSelected && (
+                          <span className="flex items-center gap-0.5 text-xs text-amber-400" title="AI Pick">
+                            <Sparkles className="h-3 w-3" />
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
