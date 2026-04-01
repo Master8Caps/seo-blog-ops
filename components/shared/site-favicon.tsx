@@ -28,7 +28,7 @@ export function SiteFavicon({ url, size = 20, className }: SiteFaviconProps) {
 
   return (
     <img
-      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=${size * 2}`}
+      src={`https://icons.duckduckgo.com/ip3/${domain}.ico`}
       alt=""
       width={size}
       height={size}
