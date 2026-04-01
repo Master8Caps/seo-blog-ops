@@ -30,12 +30,8 @@ export async function POST(request: NextRequest) {
 
   try {
     if (job.type === "generate") {
-      const payload = job.payload as { keywordId: string } | null
-      if (!payload?.keywordId) {
-        throw new Error("Job missing keywordId in payload")
-      }
-
-      const result = await generatePost(job.siteId, payload.keywordId)
+      // AI picks keywords automatically — just pass siteId
+      const result = await generatePost(job.siteId)
 
       if (!result.success) {
         throw new Error(result.error ?? "Generation failed")
@@ -45,7 +41,7 @@ export async function POST(request: NextRequest) {
         where: { id: job.id },
         data: {
           status: "completed",
-          payload: { ...payload, postId: result.postId },
+          payload: { postId: result.postId },
         },
       })
     }

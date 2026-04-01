@@ -10,17 +10,10 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { LoadingSpinner } from "@/components/shared/loading-spinner"
 import { getPosts } from "@/modules/content/actions/get-posts"
 import { generatePost } from "@/modules/content/actions/generate-post"
 import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
-import { getKeywordsForSiteId } from "@/modules/research/actions/get-keywords"
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "border-blue-500/50 bg-blue-500/10 text-blue-400" },
@@ -35,12 +28,8 @@ export default function SiteContentPage() {
 
   const [siteId, setSiteId] = useState("")
   const [posts, setPosts] = useState<Awaited<ReturnType<typeof getPosts>>>([])
-  const [approvedKeywords, setApprovedKeywords] = useState<
-    Array<{ id: string; keyword: string }>
-  >([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
-  const [generatingStep, setGeneratingStep] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
@@ -49,39 +38,29 @@ export default function SiteContentPage() {
       const site = await getSiteBySlug(siteSlug)
       if (!site) return
       setSiteId(site.id)
-      const [sitePosts, keywords] = await Promise.all([
-        getPosts({ siteId: site.id }),
-        getKeywordsForSiteId(site.id, "approved"),
-      ])
+      const sitePosts = await getPosts({ siteId: site.id })
       setPosts(sitePosts)
-      setApprovedKeywords(
-        keywords.map((k) => ({ id: k.id, keyword: k.keyword }))
-      )
       setLoading(false)
     }
     loadData()
   }, [siteSlug])
 
-  async function handleGenerate(keywordId: string) {
+  async function handleGenerate() {
     setGenerating(true)
     setError(null)
     setSuccessMsg(null)
-    setGeneratingStep("Generating blog post...")
 
-    const result = await generatePost(siteId, keywordId)
+    const result = await generatePost(siteId)
 
     if (result.success) {
-      setSuccessMsg("Post generated successfully!")
+      setSuccessMsg("Post generated successfully! AI selected the best keywords.")
       const updated = await getPosts({ siteId })
       setPosts(updated)
-      const keywords = await getKeywordsForSiteId(siteId, "approved")
-      setApprovedKeywords(keywords.map((k) => ({ id: k.id, keyword: k.keyword })))
     } else {
       setError(result.error ?? "Generation failed")
     }
 
     setGenerating(false)
-    setGeneratingStep("")
   }
 
   if (loading) {
@@ -93,42 +72,19 @@ export default function SiteContentPage() {
       {/* Toolbar */}
       <div className="flex items-center justify-between">
         <div />
-        {approvedKeywords.length > 0 ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button disabled={generating}>
-                  {generating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {generatingStep}
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Generate Post
-                    </>
-                  )}
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto">
-              {approvedKeywords.map((kw) => (
-                <DropdownMenuItem
-                  key={kw.id}
-                  onClick={() => handleGenerate(kw.id)}
-                >
-                  {kw.keyword}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <Button disabled>
-            <Sparkles className="mr-2 h-4 w-4" />
-            No approved keywords
-          </Button>
-        )}
+        <Button onClick={handleGenerate} disabled={generating}>
+          {generating ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Generating post...
+            </>
+          ) : (
+            <>
+              <Sparkles className="mr-2 h-4 w-4" />
+              Generate Post
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Messages */}
@@ -149,7 +105,7 @@ export default function SiteContentPage() {
           <FileText className="h-12 w-12 text-muted-foreground" />
           <p className="mt-4 text-lg font-medium">No posts yet</p>
           <p className="text-sm text-muted-foreground">
-            Generate a post from an approved keyword.
+            Click &quot;Generate Post&quot; — AI will pick the best keywords automatically.
           </p>
         </div>
       ) : (

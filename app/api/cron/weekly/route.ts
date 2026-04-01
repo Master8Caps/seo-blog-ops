@@ -11,30 +11,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  // Find all autopilot sites
+  // Find all autopilot sites that have approved keywords
   const autopilotSites = await prisma.site.findMany({
-    where: { autopilot: true },
-    select: { id: true, slug: true },
+    where: {
+      autopilot: true,
+      keywords: { some: { status: "approved" } },
+    },
+    select: { id: true },
   })
 
   if (autopilotSites.length === 0) {
-    return NextResponse.json({ message: "No autopilot sites", queued: 0 })
+    return NextResponse.json({ message: "No autopilot sites with approved keywords", queued: 0 })
   }
 
   let queued = 0
 
   for (const site of autopilotSites) {
-    // Find the next unused approved keyword (oldest first)
-    const nextKeyword = await prisma.keyword.findFirst({
-      where: {
-        siteId: site.id,
-        status: "approved",
-      },
-      orderBy: { createdAt: "asc" },
-    })
-
-    if (!nextKeyword) continue
-
     // Check if there's already a pending/processing job for this site
     const existingJob = await prisma.jobQueue.findFirst({
       where: {
@@ -45,13 +37,12 @@ export async function GET(request: NextRequest) {
 
     if (existingJob) continue
 
-    // Queue a generate job
+    // Queue a generate job — AI will pick the keywords automatically
     await prisma.jobQueue.create({
       data: {
         siteId: site.id,
         type: "generate",
         status: "pending",
-        payload: { keywordId: nextKeyword.id },
       },
     })
     queued++

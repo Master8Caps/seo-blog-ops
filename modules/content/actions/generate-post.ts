@@ -4,15 +4,17 @@ import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/db/prisma"
 import { anthropic } from "@/lib/ai/client"
 import {
+  buildKeywordGroupSelectionPrompt,
   buildBlogGenerationPrompt,
+  type KeywordGroupSelectionResult,
   type BlogGenerationResult,
+  type KeywordForBlog,
 } from "@/lib/ai/prompts/blog-generation"
 import { humanizeContent } from "../services/humanizer"
 import {
   generateAndUploadImages,
   replaceImageMarkers,
 } from "../services/image-generator"
-import type { SiteProfile } from "@/modules/sites/types"
 
 interface GeneratePostResult {
   success: boolean
@@ -20,33 +22,94 @@ interface GeneratePostResult {
   error?: string
 }
 
+/**
+ * Generate a blog post for a site. AI automatically picks 2-3 approved
+ * keywords that work well together, writes the post targeting all of them,
+ * humanizes via StealthGPT, generates images, and saves as draft.
+ */
 export async function generatePost(
-  siteId: string,
-  keywordId: string
+  siteId: string
 ): Promise<GeneratePostResult> {
   const site = await prisma.site.findUnique({ where: { id: siteId } })
   if (!site) return { success: false, error: "Site not found" }
 
-  const keyword = await prisma.keyword.findUnique({ where: { id: keywordId } })
-  if (!keyword) return { success: false, error: "Keyword not found" }
+  // Get all approved keywords for this site
+  const approvedKeywords = await prisma.keyword.findMany({
+    where: { siteId, status: "approved" },
+    orderBy: { searchVolume: "desc" },
+  })
+
+  if (approvedKeywords.length === 0) {
+    return { success: false, error: "No approved keywords available. Run research first." }
+  }
 
   try {
-    // Step 1: Generate blog content with Claude
-    const prompt = buildBlogGenerationPrompt({
+    // Step 1: AI picks 2-3 keywords that work well together
+    let primaryKw: KeywordForBlog
+    let secondaryKws: KeywordForBlog[] = []
+
+    if (approvedKeywords.length === 1) {
+      // Only one keyword, use it as primary with no secondaries
+      primaryKw = approvedKeywords[0]
+    } else {
+      const selectionPrompt = buildKeywordGroupSelectionPrompt({
+        siteNiche: site.niche ?? "unknown",
+        siteAudience: site.audience ?? "unknown",
+        keywords: approvedKeywords.map((k) => ({
+          keyword: k.keyword,
+          searchVolume: k.searchVolume,
+          intent: k.intent,
+          cluster: k.cluster,
+        })),
+      })
+
+      const selectionMsg = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: selectionPrompt }],
+      })
+
+      const selectionText = selectionMsg.content.find((b) => b.type === "text")
+      if (!selectionText || selectionText.type !== "text") {
+        return { success: false, error: "AI keyword selection failed" }
+      }
+
+      const selection = JSON.parse(selectionText.text) as KeywordGroupSelectionResult
+
+      // Match selected keywords back to DB records
+      const primaryMatch = approvedKeywords.find(
+        (k) => k.keyword.toLowerCase() === selection.primary.toLowerCase()
+      )
+      if (!primaryMatch) {
+        // Fallback: use highest volume keyword
+        primaryKw = approvedKeywords[0]
+      } else {
+        primaryKw = primaryMatch
+      }
+
+      secondaryKws = selection.secondary
+        .map((s) =>
+          approvedKeywords.find(
+            (k) => k.keyword.toLowerCase() === s.toLowerCase()
+          )
+        )
+        .filter((k): k is NonNullable<typeof k> => k != null && k.id !== primaryKw.id)
+    }
+
+    // Step 2: Generate blog content with Claude
+    const blogPrompt = buildBlogGenerationPrompt({
       siteNiche: site.niche ?? "unknown",
       siteAudience: site.audience ?? "unknown",
       siteTone: site.tone ?? "professional",
       siteTopics: (site.topics as string[]) ?? [],
-      keyword: keyword.keyword,
-      keywordIntent: keyword.intent,
-      keywordCluster: keyword.cluster,
-      searchVolume: keyword.searchVolume,
+      primaryKeyword: primaryKw,
+      secondaryKeywords: secondaryKws,
     })
 
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 4000,
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: blogPrompt }],
     })
 
     const textBlock = message.content.find((block) => block.type === "text")
@@ -56,11 +119,11 @@ export async function generatePost(
 
     const blog = JSON.parse(textBlock.text) as BlogGenerationResult
 
-    // Step 2: Create post record first (need ID for image storage path)
+    // Step 3: Create post record (linked to primary keyword)
     const post = await prisma.post.create({
       data: {
         siteId,
-        keywordId,
+        keywordId: primaryKw.id,
         title: blog.title,
         slug: blog.slug,
         content: blog.content,
@@ -69,21 +132,22 @@ export async function generatePost(
         metaDesc: blog.metaDesc,
         status: "draft",
         generatedBy: "claude-sonnet",
-        promptVersion: "v1",
+        promptVersion: "v2",
       },
     })
 
-    // Step 3: Humanize content via StealthGPT
+    // Step 4: Humanize content via StealthGPT
     let finalContent = blog.content
     try {
       finalContent = await humanizeContent(blog.content, {
-        keyword: keyword.keyword,
+        keyword: primaryKw.keyword,
+        additionalKeywords: secondaryKws.map((k) => k.keyword),
       })
     } catch (error) {
       console.error("StealthGPT humanization failed, using original:", error)
     }
 
-    // Step 4: Generate images via Gemini
+    // Step 5: Generate images via Gemini
     let images: Awaited<ReturnType<typeof generateAndUploadImages>> = []
     try {
       images = await generateAndUploadImages(post.id, blog.imagePrompts)
@@ -92,7 +156,7 @@ export async function generatePost(
       console.error("Image generation failed, continuing without images:", error)
     }
 
-    // Step 5: Update post with humanized content + images
+    // Step 6: Update post with humanized content + images
     await prisma.post.update({
       where: { id: post.id },
       data: {
@@ -104,11 +168,8 @@ export async function generatePost(
       },
     })
 
-    // Step 6: Mark keyword as used
-    await prisma.keyword.update({
-      where: { id: keywordId },
-      data: { status: "used" },
-    })
+    // Keywords stay "approved" — they can be reused across multiple posts.
+    // Usage is tracked through the Post → Keyword relation.
 
     revalidatePath(`/sites/${site.slug}`)
     revalidatePath(`/sites/${site.slug}/content`)
