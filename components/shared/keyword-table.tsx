@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Table,
   TableBody,
@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Check, X, ArrowUpDown } from "lucide-react"
+import { Check, X, ArrowUpDown, Layers } from "lucide-react"
 import {
   updateKeywordStatus,
   bulkUpdateKeywordStatus,
@@ -58,6 +58,19 @@ interface KeywordTableProps {
 
 type SortDir = "asc" | "desc"
 
+const competitionConfig: Record<string, { className: string }> = {
+  high: { className: "border-red-500/50 bg-red-500/10 text-red-400" },
+  medium: { className: "border-yellow-500/50 bg-yellow-500/10 text-yellow-400" },
+  low: { className: "border-green-500/50 bg-green-500/10 text-green-400" },
+}
+
+const statusConfig: Record<string, { className: string }> = {
+  discovered: { className: "border-blue-500/50 bg-blue-500/10 text-blue-400" },
+  approved: { className: "border-green-500/50 bg-green-500/10 text-green-400" },
+  used: { className: "border-purple-500/50 bg-purple-500/10 text-purple-400" },
+  rejected: { className: "border-red-500/50 bg-red-500/10 text-red-400" },
+}
+
 const intentColors: Record<string, "default" | "secondary" | "outline"> = {
   informational: "secondary",
   transactional: "default",
@@ -65,22 +78,18 @@ const intentColors: Record<string, "default" | "secondary" | "outline"> = {
   navigational: "outline",
 }
 
-const statusColors: Record<
-  string,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  discovered: "secondary",
-  approved: "default",
-  used: "outline",
-  rejected: "destructive",
-}
-
-export function KeywordTable({ keywords: initialKeywords }: KeywordTableProps) {
-  const [keywords, setKeywords] = useState(initialKeywords)
+export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
+  const [keywords, setKeywords] = useState(propKeywords)
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [sortField, setSortField] = useState<SortField>("relevanceScore")
+  const [sortField, setSortField] = useState<SortField>("searchVolume")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
   const [updating, setUpdating] = useState<string | null>(null)
+  const [groupByCompetition, setGroupByCompetition] = useState(false)
+
+  // Sync internal state when parent passes new data (e.g. after AI scoring)
+  useEffect(() => {
+    setKeywords(propKeywords)
+  }, [propKeywords])
 
   function handleSort(field: SortField) {
     if (sortField === field) {
@@ -92,6 +101,14 @@ export function KeywordTable({ keywords: initialKeywords }: KeywordTableProps) {
   }
 
   const sorted = [...keywords].sort((a, b) => {
+    // If grouping by competition, sort by competition first
+    if (groupByCompetition) {
+      const compOrder: Record<string, number> = { low: 0, medium: 1, high: 2 }
+      const aComp = compOrder[a.competition?.toLowerCase() ?? ""] ?? 3
+      const bComp = compOrder[b.competition?.toLowerCase() ?? ""] ?? 3
+      if (aComp !== bComp) return aComp - bComp
+    }
+
     const aVal = a[sortField] ?? 0
     const bVal = b[sortField] ?? 0
     if (typeof aVal === "string" && typeof bVal === "string") {
@@ -143,32 +160,48 @@ export function KeywordTable({ keywords: initialKeywords }: KeywordTableProps) {
     setUpdating(null)
   }
 
+  // Track competition group headers when grouping
+  let lastCompetition: string | null = null
+
   return (
     <div className="space-y-4">
-      {selected.size > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
-          <span className="text-sm text-muted-foreground">
-            {selected.size} selected
-          </span>
-          <Button
-            size="sm"
-            onClick={() => handleBulkAction("approved")}
-            disabled={updating === "bulk"}
-          >
-            <Check className="mr-1 h-3.5 w-3.5" />
-            Approve
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => handleBulkAction("rejected")}
-            disabled={updating === "bulk"}
-          >
-            <X className="mr-1 h-3.5 w-3.5" />
-            Reject
-          </Button>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {selected.size > 0 && (
+            <>
+              <span className="text-sm text-muted-foreground">
+                {selected.size} selected
+              </span>
+              <Button
+                size="sm"
+                onClick={() => handleBulkAction("approved")}
+                disabled={updating === "bulk"}
+              >
+                <Check className="mr-1 h-3.5 w-3.5" />
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => handleBulkAction("rejected")}
+                disabled={updating === "bulk"}
+              >
+                <X className="mr-1 h-3.5 w-3.5" />
+                Reject
+              </Button>
+            </>
+          )}
         </div>
-      )}
+        <Button
+          variant={groupByCompetition ? "default" : "outline"}
+          size="sm"
+          onClick={() => setGroupByCompetition(!groupByCompetition)}
+        >
+          <Layers className="mr-1.5 h-3.5 w-3.5" />
+          Group by Competition
+        </Button>
+      </div>
 
       <div className="rounded-lg border border-border">
         <Table>
@@ -202,96 +235,126 @@ export function KeywordTable({ keywords: initialKeywords }: KeywordTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((kw) => (
-              <TableRow key={kw.id}>
-                <TableCell>
-                  <Checkbox
-                    checked={selected.has(kw.id)}
-                    onCheckedChange={() => toggleSelect(kw.id)}
-                  />
-                </TableCell>
-                <TableCell className="font-medium">{kw.keyword}</TableCell>
-                <TableCell className="text-right">
-                  {kw.searchVolume?.toLocaleString() ?? "—"}
-                </TableCell>
-                <TableCell className="text-right">
-                  {kw.cpc != null ? `$${kw.cpc.toFixed(2)}` : "—"}
-                </TableCell>
-                <TableCell>
-                  {kw.competition ? (
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {kw.competition.toLowerCase()}
-                    </Badge>
-                  ) : (
-                    "—"
+            {sorted.map((kw) => {
+              const compKey = kw.competition?.toLowerCase() ?? "unknown"
+              const showGroupHeader =
+                groupByCompetition && compKey !== lastCompetition
+              if (groupByCompetition) lastCompetition = compKey
+
+              const compStyle =
+                competitionConfig[compKey] ?? { className: "text-muted-foreground" }
+              const statStyle =
+                statusConfig[kw.status] ?? statusConfig.discovered
+
+              return (
+                <>
+                  {showGroupHeader && (
+                    <TableRow key={`group-${compKey}`} className="bg-muted/30">
+                      <TableCell colSpan={10} className="py-2">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          {compKey} Competition
+                        </span>
+                      </TableCell>
+                    </TableRow>
                   )}
-                </TableCell>
-                <TableCell className="text-right">
-                  {kw.relevanceScore != null ? (
-                    <span
-                      className={
-                        kw.relevanceScore >= 0.8
-                          ? "text-green-400"
-                          : kw.relevanceScore >= 0.5
-                            ? "text-yellow-400"
-                            : "text-muted-foreground"
-                      }
-                    >
-                      {(kw.relevanceScore * 100).toFixed(0)}%
-                    </span>
-                  ) : (
-                    "—"
-                  )}
-                </TableCell>
-                <TableCell>
-                  {kw.intent ? (
-                    <Badge
-                      variant={intentColors[kw.intent] ?? "secondary"}
-                      className="text-xs capitalize"
-                    >
-                      {kw.intent}
-                    </Badge>
-                  ) : (
-                    "—"
-                  )}
-                </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
-                  {kw.cluster ?? "—"}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={statusColors[kw.status] ?? "secondary"}
-                    className="text-xs capitalize"
-                  >
-                    {kw.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    {kw.status !== "approved" && (
-                      <button
-                        onClick={() => handleStatusChange(kw.id, "approved")}
-                        disabled={updating === kw.id}
-                        className="rounded p-1 hover:bg-primary/10 text-primary transition-colors"
-                        title="Approve"
+                  <TableRow key={kw.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selected.has(kw.id)}
+                        onCheckedChange={() => toggleSelect(kw.id)}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">{kw.keyword}</TableCell>
+                    <TableCell className="text-right">
+                      {kw.searchVolume?.toLocaleString() ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {kw.cpc != null ? `$${kw.cpc.toFixed(2)}` : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {kw.competition ? (
+                        <Badge
+                          variant="outline"
+                          className={`text-xs capitalize ${compStyle.className}`}
+                        >
+                          {kw.competition.toLowerCase()}
+                        </Badge>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {kw.relevanceScore != null ? (
+                        <span
+                          className={
+                            kw.relevanceScore >= 0.8
+                              ? "text-green-400"
+                              : kw.relevanceScore >= 0.5
+                                ? "text-yellow-400"
+                                : "text-muted-foreground"
+                          }
+                        >
+                          {(kw.relevanceScore * 100).toFixed(0)}%
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {kw.intent ? (
+                        <Badge
+                          variant={intentColors[kw.intent] ?? "secondary"}
+                          className="text-xs capitalize"
+                        >
+                          {kw.intent}
+                        </Badge>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {kw.cluster ?? "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs capitalize ${statStyle.className}`}
                       >
-                        <Check className="h-4 w-4" />
-                      </button>
-                    )}
-                    {kw.status !== "rejected" && (
-                      <button
-                        onClick={() => handleStatusChange(kw.id, "rejected")}
-                        disabled={updating === kw.id}
-                        className="rounded p-1 hover:bg-destructive/10 text-destructive transition-colors"
-                        title="Reject"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                        {kw.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {kw.status !== "approved" && (
+                          <button
+                            onClick={() =>
+                              handleStatusChange(kw.id, "approved")
+                            }
+                            disabled={updating === kw.id}
+                            className="rounded p-1 hover:bg-primary/10 text-primary transition-colors"
+                            title="Approve"
+                          >
+                            <Check className="h-4 w-4" />
+                          </button>
+                        )}
+                        {kw.status !== "rejected" && (
+                          <button
+                            onClick={() =>
+                              handleStatusChange(kw.id, "rejected")
+                            }
+                            disabled={updating === kw.id}
+                            className="rounded p-1 hover:bg-destructive/10 text-destructive transition-colors"
+                            title="Reject"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </>
+              )
+            })}
           </TableBody>
         </Table>
       </div>
