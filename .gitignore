@@ -45,6 +45,9 @@ AGENTS.md
 # project docs (internal only)
 /docs/
 
+# supabase migrations (internal only)
+/supabase/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
