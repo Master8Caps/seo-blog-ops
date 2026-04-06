@@ -159,7 +159,7 @@ export async function uploadMedia(
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Content-Type": "image/png",
     },
-    body: imageBuffer,
+    body: new Uint8Array(imageBuffer),
   })
 
   if (!res.ok) {
