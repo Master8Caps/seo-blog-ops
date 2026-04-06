@@ -115,6 +115,10 @@ model Post {
   publishedUrl String?   @map("published_url")
   externalId   String?   @map("external_id")
 
+  // WordPress taxonomy (set by AI classification)
+  wpCategoryId Int?  @map("wp_category_id")
+  wpTagIds     Json? @map("wp_tag_ids")
+
   // Generation metadata
   generatedBy   String? @map("generated_by")
   promptVersion String? @map("prompt_version")
