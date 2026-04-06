@@ -193,9 +193,14 @@ export async function selectKeywords(siteId: string): Promise<StepResult> {
     const result = parseAIJson<KeywordSelectionResult>(textBlock.text)
     const selectedSet = new Set(result.selected.map((s) => s.toLowerCase()))
 
+    const MIN_RELEVANCE = 0.4
+    const MAX_APPROVED = 15
+
     let approved = 0
     for (const kw of scored) {
+      if (approved >= MAX_APPROVED) break
       if (selectedSet.has(kw.keyword.toLowerCase())) {
+        if ((kw.relevanceScore ?? 0) < MIN_RELEVANCE) continue
         await prisma.keyword.update({
           where: { id: kw.id },
           data: { status: "approved", aiSelected: true },

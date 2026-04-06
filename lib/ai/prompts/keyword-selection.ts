@@ -33,13 +33,18 @@ Target audience: ${input.siteAudience}
 Tone: ${input.siteTone}
 Core topics: ${input.siteTopics.join(", ")}
 
-Select the best 15 keywords (or fewer if less than 15 available) from the list below. Each selected keyword will become a blog post.
+Select EXACTLY 15 keywords (or fewer if less than 15 available) from the list below. Each selected keyword will become a blog post. Do NOT select more than 15.
+
+HARD RULES:
+- NEVER select a keyword with relevance below 40%. No exceptions.
+- Select EXACTLY 15 keywords (or all of them if fewer than 15 have relevance >= 40%).
 
 Selection criteria (in priority order):
-1. **Topic coverage** — spread across different clusters. Max 3 keywords per cluster.
-2. **Quick wins** — favour keywords with high relevance, low competition, and decent search volume.
-3. **Intent mix** — primarily informational keywords (good for blog content), but include 2-3 commercial keywords if available.
-4. **Avoid cannibalisation** — don't pick keywords that are too similar to each other (e.g. "best X" and "top X" — pick one).
+1. **Relevance and volume first** — strongly favour keywords with high relevance scores AND high search volume. A keyword with 60%+ relevance and high volume should almost always be selected over one with lower relevance, regardless of other factors.
+2. **Quick wins** — among similarly relevant keywords, favour low competition and high CPC.
+3. **Avoid cannibalisation** — don't pick keywords that are too similar (e.g. "best X" and "top X" — pick one).
+4. **Topic coverage** — try to spread across clusters, but NOT at the expense of picking low-relevance keywords. Max 3 keywords per cluster.
+5. **Intent mix** — primarily informational (good for blogs), but include 1-2 commercial keywords if they have strong relevance.
 
 Available keywords:
 ${keywordList}
