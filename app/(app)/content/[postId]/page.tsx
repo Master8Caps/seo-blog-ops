@@ -11,6 +11,8 @@ import {
   Save,
   Loader2,
   Trash2,
+  Send,
+  ExternalLink,
 } from "lucide-react"
 import Link from "next/link"
 import { buttonVariants } from "@/components/ui/button"
@@ -22,6 +24,10 @@ import {
   rejectPost,
   deletePost,
 } from "@/modules/content/actions/update-post"
+import {
+  queuePostPublish,
+  getJobStatus,
+} from "@/modules/content/actions/queue-generation"
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "border-blue-500/50 bg-blue-500/10 text-blue-400" },
@@ -42,6 +48,9 @@ export default function PostDetailPage() {
   const [dirty, setDirty] = useState(false)
   const [rejectNotes, setRejectNotes] = useState("")
   const [showRejectInput, setShowRejectInput] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [publishStep, setPublishStep] = useState<string | null>(null)
+  const [publishError, setPublishError] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -78,6 +87,46 @@ export default function PostDetailPage() {
     setPost(updated)
     setShowRejectInput(false)
     setRejectNotes("")
+  }
+
+  async function handlePublish() {
+    setPublishing(true)
+    setPublishError(null)
+
+    const result = await queuePostPublish(postId)
+    if (!result.success || !result.jobId) {
+      setPublishError(result.error ?? "Failed to queue publishing")
+      setPublishing(false)
+      return
+    }
+
+    setPublishStep("Queued, waiting to start...")
+    const jobId = result.jobId
+    const poll = setInterval(async () => {
+      const job = await getJobStatus(jobId)
+      if (!job) {
+        clearInterval(poll)
+        setPublishError("Job not found")
+        setPublishing(false)
+        setPublishStep(null)
+        return
+      }
+
+      if (job.step) setPublishStep(job.step)
+
+      if (job.status === "completed") {
+        clearInterval(poll)
+        setPublishing(false)
+        setPublishStep(null)
+        const updated = await getPostById(postId)
+        setPost(updated)
+      } else if (job.status === "failed") {
+        clearInterval(poll)
+        setPublishError(job.error ?? "Publishing failed")
+        setPublishing(false)
+        setPublishStep(null)
+      }
+    }, 3000)
   }
 
   if (loading || !post) {
@@ -141,6 +190,32 @@ export default function PostDetailPage() {
             </Button>
           </>
         )}
+        {post.status === "approved" && (
+          <>
+            <Button
+              size="sm"
+              onClick={handlePublish}
+              disabled={publishing}
+            >
+              {publishing ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Publishing...
+                </>
+              ) : (
+                <>
+                  <Send className="mr-1.5 h-3.5 w-3.5" />
+                  Publish to WordPress
+                </>
+              )}
+            </Button>
+            {publishing && publishStep && (
+              <span className="text-sm text-muted-foreground animate-pulse">
+                {publishStep}
+              </span>
+            )}
+          </>
+        )}
         <div className="ml-auto">
           <Button
             size="sm"
@@ -157,6 +232,40 @@ export default function PostDetailPage() {
           </Button>
         </div>
       </div>
+
+      {/* Publish error */}
+      {publishError && (
+        <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+          {publishError}
+        </div>
+      )}
+
+      {/* Published details */}
+      {post.status === "published" && post.publishedUrl && (
+        <div className="rounded-lg border border-purple-500/30 bg-purple-500/5 p-4 space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-purple-400">
+            Published Details
+          </p>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">URL:</span>
+            <a
+              href={post.publishedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline flex items-center gap-1"
+            >
+              {post.publishedUrl}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+          {post.publishedAt && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Published:</span>{" "}
+              {new Date(post.publishedAt).toLocaleString()}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Reject notes input */}
       {showRejectInput && (
