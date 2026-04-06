@@ -24,12 +24,26 @@ interface GeneratePostResult {
 }
 
 /**
+ * Update the job's payload with a progress step so the UI can display it.
+ */
+async function updateJobProgress(jobId: string | undefined, step: string) {
+  if (!jobId) return
+  await prisma.jobQueue.update({
+    where: { id: jobId },
+    data: {
+      payload: { step },
+    },
+  })
+}
+
+/**
  * Generate a blog post for a site. AI automatically picks 2-3 approved
  * keywords that work well together, writes the post targeting all of them,
  * humanizes via StealthGPT, generates images, and saves as draft.
  */
 export async function generatePost(
-  siteId: string
+  siteId: string,
+  jobId?: string
 ): Promise<GeneratePostResult> {
   const site = await prisma.site.findUnique({ where: { id: siteId } })
   if (!site) return { success: false, error: "Site not found" }
@@ -46,6 +60,7 @@ export async function generatePost(
 
   try {
     // Step 1: AI picks 2-3 keywords that work well together
+    await updateJobProgress(jobId, "Selecting best keywords...")
     let primaryKw: KeywordForBlog
     let secondaryKws: KeywordForBlog[] = []
 
@@ -98,6 +113,7 @@ export async function generatePost(
     }
 
     // Step 2: Generate blog content with Claude
+    await updateJobProgress(jobId, "Writing blog content with AI...")
     const blogPrompt = buildBlogGenerationPrompt({
       siteNiche: site.niche ?? "unknown",
       siteAudience: site.audience ?? "unknown",
@@ -121,6 +137,7 @@ export async function generatePost(
     const blog = parseAIJson<BlogGenerationResult>(textBlock.text) as BlogGenerationResult
 
     // Step 3: Create post record (linked to primary keyword)
+    await updateJobProgress(jobId, "Saving draft post...")
     const post = await prisma.post.create({
       data: {
         siteId,
@@ -138,6 +155,7 @@ export async function generatePost(
     })
 
     // Step 4: Humanize content via StealthGPT
+    await updateJobProgress(jobId, "Humanizing content via StealthGPT...")
     let finalContent = blog.content
     try {
       finalContent = await humanizeContent(blog.content, {
@@ -149,6 +167,7 @@ export async function generatePost(
     }
 
     // Step 5: Generate images via Gemini
+    await updateJobProgress(jobId, "Generating images with Gemini...")
     let images: Awaited<ReturnType<typeof generateAndUploadImages>> = []
     try {
       images = await generateAndUploadImages(post.id, blog.imagePrompts)
@@ -158,6 +177,7 @@ export async function generatePost(
     }
 
     // Step 6: Update post with humanized content + images
+    await updateJobProgress(jobId, "Finalizing post...")
     await prisma.post.update({
       where: { id: post.id },
       data: {

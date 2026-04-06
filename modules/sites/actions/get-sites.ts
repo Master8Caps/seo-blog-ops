@@ -24,6 +24,23 @@ export async function getSiteById(id: string) {
   })
 }
 
+export async function getSitesForGeneration() {
+  return prisma.site.findMany({
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      url: true,
+      _count: {
+        select: {
+          keywords: { where: { status: "approved" } },
+        },
+      },
+    },
+  })
+}
+
 export async function getSiteBySlug(slug: string) {
   return prisma.site.findUnique({
     where: { slug },

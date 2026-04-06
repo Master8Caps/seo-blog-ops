@@ -70,5 +70,12 @@ export async function getJobStatus(jobId: string) {
     where: { id: jobId },
     select: { status: true, payload: true },
   })
-  return job
+  if (!job) return null
+  const payload = job.payload as { step?: string; error?: string; postId?: string } | null
+  return {
+    status: job.status,
+    step: payload?.step ?? null,
+    error: payload?.error ?? null,
+    postId: payload?.postId ?? null,
+  }
 }

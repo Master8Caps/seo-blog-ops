@@ -33,6 +33,7 @@ export default function SiteContentPage() {
   const [posts, setPosts] = useState<Awaited<ReturnType<typeof getPosts>>>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [generationStep, setGenerationStep] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
@@ -68,15 +69,21 @@ export default function SiteContentPage() {
       return
     }
 
-    // Poll for job completion
+    // Poll for job completion + progress
     const jobId = result.jobId
+    setGenerationStep("Queued, waiting to start...")
     const poll = setInterval(async () => {
       const job = await getJobStatus(jobId)
       if (!job) {
         clearInterval(poll)
         setError("Job not found")
         setGenerating(false)
+        setGenerationStep(null)
         return
+      }
+
+      if (job.step) {
+        setGenerationStep(job.step)
       }
 
       if (job.status === "completed") {
@@ -84,13 +91,13 @@ export default function SiteContentPage() {
         setSuccessMsg("Post generated successfully! AI selected the best keywords.")
         await refreshPosts()
         setGenerating(false)
+        setGenerationStep(null)
       } else if (job.status === "failed") {
         clearInterval(poll)
-        const payload = job.payload as { error?: string } | null
-        setError(payload?.error ?? "Generation failed")
+        setError(job.error ?? "Generation failed")
         setGenerating(false)
+        setGenerationStep(null)
       }
-      // "pending" or "processing" — keep polling
     }, 3000)
   }
 
@@ -103,19 +110,26 @@ export default function SiteContentPage() {
       {/* Toolbar */}
       <div className="flex items-center justify-between">
         <div />
-        <Button onClick={handleGenerate} disabled={generating}>
-          {generating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating post...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Generate Post
-            </>
+        <div className="flex items-center gap-3">
+          {generating && generationStep && (
+            <span className="text-sm text-muted-foreground animate-pulse">
+              {generationStep}
+            </span>
           )}
-        </Button>
+          <Button onClick={handleGenerate} disabled={generating}>
+            {generating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generate Post
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Messages */}

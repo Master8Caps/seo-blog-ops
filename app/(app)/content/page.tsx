@@ -2,6 +2,7 @@ import Link from "next/link"
 import { FileText, ArrowRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { getPosts } from "@/modules/content/actions/get-posts"
+import { GenerateContentButton } from "@/components/shared/generate-content-button"
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "border-blue-500/50 bg-blue-500/10 text-blue-400" },
@@ -39,11 +40,14 @@ export default async function ContentPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Content</h1>
-        <p className="text-muted-foreground">
-          Manage generated blog posts across all sites.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Content</h1>
+          <p className="text-muted-foreground">
+            Manage generated blog posts across all sites.
+          </p>
+        </div>
+        <GenerateContentButton />
       </div>
 
       {posts.length === 0 ? (

@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   try {
     if (job.type === "generate") {
       // AI picks keywords automatically — just pass siteId
-      const result = await generatePost(job.siteId)
+      const result = await generatePost(job.siteId, job.id)
 
       if (!result.success) {
         throw new Error(result.error ?? "Generation failed")
