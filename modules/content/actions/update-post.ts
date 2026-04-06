@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/db/prisma"
+import { queuePostPublish } from "./queue-generation"
 
 export async function updatePostContent(postId: string, content: string) {
   const post = await prisma.post.update({
@@ -23,11 +24,22 @@ export async function approvePost(postId: string, approvedBy: string) {
       approvedBy,
       approvedAt: new Date(),
     },
-    include: { site: { select: { slug: true } } },
+    include: { site: true },
   })
+
   revalidatePath(`/content/${postId}`)
   revalidatePath(`/sites/${post.site.slug}/content`)
   revalidatePath("/content")
+
+  // Auto-publish if site has it enabled
+  const config = post.site.publishConfig as Record<string, unknown> | null
+  if (
+    post.site.publishType === "wordpress" &&
+    config?.autoPublishOnApproval === true
+  ) {
+    await queuePostPublish(postId)
+  }
+
   return post
 }
 
