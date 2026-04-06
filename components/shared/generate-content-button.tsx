@@ -79,65 +79,66 @@ export function GenerateContentButton() {
   }
 
   const eligibleSites = sites.filter((s) => s._count.keywords > 0)
+  const selectedSite = sites.find((s) => s.id === selectedSiteId)
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <Select
-          value={selectedSiteId}
-          onValueChange={(val) => setSelectedSiteId(val ?? "")}
-          disabled={generating}
-        >
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="Select a site..." />
-          </SelectTrigger>
-          <SelectContent>
-            {eligibleSites.length === 0 ? (
-              <SelectItem value="_none" disabled>
-                No sites with approved keywords
-              </SelectItem>
-            ) : (
-              eligibleSites.map((site) => (
-                <SelectItem key={site.id} value={site.id}>
-                  {site.name}{" "}
-                  <span className="text-muted-foreground">
-                    ({site._count.keywords} keywords)
-                  </span>
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
-        <Button
-          onClick={handleGenerate}
-          disabled={generating || !selectedSiteId}
-        >
-          {generating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating...
-            </>
+    <div className="flex flex-col items-end gap-2">
+      <Select
+        value={selectedSiteId}
+        onValueChange={(val) => setSelectedSiteId(val ?? "")}
+        disabled={generating}
+      >
+        <SelectTrigger className="w-[220px]">
+          <SelectValue placeholder="Select a site...">
+            {selectedSite
+              ? `${selectedSite.name} (${selectedSite._count.keywords} keywords)`
+              : "Select a site..."}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {eligibleSites.length === 0 ? (
+            <SelectItem value="_none" disabled>
+              No sites with approved keywords
+            </SelectItem>
           ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Generate Post
-            </>
+            eligibleSites.map((site) => (
+              <SelectItem key={site.id} value={site.id}>
+                {site.name} ({site._count.keywords} keywords)
+              </SelectItem>
+            ))
           )}
-        </Button>
-        {generating && generationStep && (
-          <span className="text-sm text-muted-foreground animate-pulse">
-            {generationStep}
-          </span>
+        </SelectContent>
+      </Select>
+      <Button
+        onClick={handleGenerate}
+        disabled={generating || !selectedSiteId}
+        className="w-[220px]"
+      >
+        {generating ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Generating...
+          </>
+        ) : (
+          <>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Generate Post
+          </>
         )}
-      </div>
+      </Button>
+      {generating && generationStep && (
+        <span className="text-sm text-muted-foreground animate-pulse">
+          {generationStep}
+        </span>
+      )}
 
       {error && (
-        <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+        <div className="w-[220px] rounded-md bg-destructive/15 p-3 text-sm text-destructive">
           {error}
         </div>
       )}
       {successMsg && (
-        <div className="rounded-md bg-primary/15 p-3 text-sm text-primary">
+        <div className="w-[220px] rounded-md bg-primary/15 p-3 text-sm text-primary">
           {successMsg}
         </div>
       )}
