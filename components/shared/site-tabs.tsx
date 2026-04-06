@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Search, FileText } from "lucide-react"
+import { LayoutDashboard, Search, FileText, Send } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface SiteTabsProps {
@@ -13,6 +13,7 @@ const tabs = [
   { label: "Overview", href: "", icon: LayoutDashboard },
   { label: "Research", href: "/research", icon: Search },
   { label: "Content", href: "/content", icon: FileText },
+  { label: "Publishing", href: "/publishing", icon: Send },
 ]
 
 export function SiteTabs({ siteSlug }: SiteTabsProps) {
