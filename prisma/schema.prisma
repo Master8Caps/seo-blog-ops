@@ -31,6 +31,9 @@ model Site {
   topics     Json?
   seoProfile Json?   @map("seo_profile")
 
+  // Branding
+  logoUrl String? @map("logo_url")
+
   // Settings
   autopilot Boolean @default(false)
 
@@ -115,9 +118,9 @@ model Post {
   publishedUrl String?   @map("published_url")
   externalId   String?   @map("external_id")
 
-  // WordPress taxonomy (set by AI classification)
-  wpCategoryId Int?  @map("wp_category_id")
-  wpTagIds     Json? @map("wp_tag_ids")
+  // Taxonomy (set by AI classification — slugs, platform-agnostic)
+  category String?
+  tags     String?
 
   // Generation metadata
   generatedBy   String? @map("generated_by")

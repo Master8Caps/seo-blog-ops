@@ -25,6 +25,7 @@ export interface DashboardStats {
     slug: string
     name: string
     url: string
+    logoUrl: string | null
     onboardingStatus: string
     createdAt: Date
   }[]
@@ -55,6 +56,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         slug: true,
         name: true,
         url: true,
+        logoUrl: true,
         onboardingStatus: true,
         createdAt: true,
       },

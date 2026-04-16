@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Globe,
   FileText,
+  Activity,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -32,17 +33,19 @@ import { Logo } from "@/components/shared/logo"
 import { createSupabaseBrowserClient } from "@/lib/auth/supabase-browser"
 
 const mainNavItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/sites", label: "Sites", icon: Globe },
-  { href: "/content", label: "Content", icon: FileText },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badgeKey: null as null | "activity" },
+  { href: "/sites", label: "Sites", icon: Globe, badgeKey: null as null | "activity" },
+  { href: "/content", label: "Content", icon: FileText, badgeKey: null as null | "activity" },
+  { href: "/activity", label: "Activity", icon: Activity, badgeKey: "activity" as const },
 ]
 
 interface SidebarProps {
   userEmail?: string
   userName?: string
+  activeJobCount?: number
 }
 
-export function Sidebar({ userEmail, userName }: SidebarProps) {
+export function Sidebar({ userEmail, userName, activeJobCount = 0 }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
@@ -99,6 +102,8 @@ export function Sidebar({ userEmail, userName }: SidebarProps) {
         <nav className="flex-1 space-y-1 p-2">
           {mainNavItems.map((item) => {
             const isActive = pathname.startsWith(item.href)
+            const showBadge =
+              item.badgeKey === "activity" && activeJobCount > 0
             const link = (
               <Link
                 key={item.href}
@@ -110,8 +115,31 @@ export function Sidebar({ userEmail, userName }: SidebarProps) {
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 )}
               >
-                <item.icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
+                <div className="relative shrink-0">
+                  <item.icon className="h-5 w-5" />
+                  {showBadge && collapsed && (
+                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                    </span>
+                  )}
+                </div>
+                {!collapsed && (
+                  <>
+                    <span className="flex-1">{item.label}</span>
+                    {showBadge && (
+                      <span className="flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                        </span>
+                        <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-semibold text-primary tabular-nums">
+                          {activeJobCount}
+                        </span>
+                      </span>
+                    )}
+                  </>
+                )}
               </Link>
             )
 
@@ -119,7 +147,10 @@ export function Sidebar({ userEmail, userName }: SidebarProps) {
               return (
                 <Tooltip key={item.href}>
                   <TooltipTrigger render={link} />
-                  <TooltipContent side="right">{item.label}</TooltipContent>
+                  <TooltipContent side="right">
+                    {item.label}
+                    {showBadge && ` (${activeJobCount} running)`}
+                  </TooltipContent>
                 </Tooltip>
               )
             }

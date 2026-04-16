@@ -29,7 +29,7 @@ export default async function SiteLayout({
         </LinkButton>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <SiteFavicon url={site.url} size={40} className="shrink-0 rounded-md" />
+            <SiteFavicon url={site.url} logoUrl={site.logoUrl} size={40} className="shrink-0 rounded-md" />
             <h1 className="text-3xl font-bold tracking-tight">{site.name}</h1>
             {site.autopilot && (
               <Badge variant="outline">Autopilot</Badge>

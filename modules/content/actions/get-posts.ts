@@ -23,7 +23,7 @@ export async function getPostById(id: string) {
   return prisma.post.findUnique({
     where: { id },
     include: {
-      site: { select: { name: true, slug: true, url: true } },
+      site: { select: { name: true, slug: true, url: true, publishType: true } },
       keyword: { select: { keyword: true } },
     },
   })

@@ -41,6 +41,7 @@ export default async function SitesPage() {
               slug={site.slug}
               name={site.name}
               url={site.url}
+              logoUrl={site.logoUrl}
               niche={site.niche}
               onboardingStatus={site.onboardingStatus}
               autopilot={site.autopilot}

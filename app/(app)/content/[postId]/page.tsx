@@ -205,7 +205,7 @@ export default function PostDetailPage() {
               ) : (
                 <>
                   <Send className="mr-1.5 h-3.5 w-3.5" />
-                  Publish to WordPress
+                  {post.site.publishType === "wordpress" ? "Publish to WordPress" : "Publish"}
                 </>
               )}
             </Button>

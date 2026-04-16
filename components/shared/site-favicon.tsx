@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 
 interface SiteFaviconProps {
   url: string
+  logoUrl?: string | null
   size?: number
   className?: string
 }
@@ -18,22 +19,40 @@ function getDomain(url: string): string {
   }
 }
 
-export function SiteFavicon({ url, size = 20, className }: SiteFaviconProps) {
-  const [failed, setFailed] = useState(false)
-  const domain = getDomain(url)
+export function SiteFavicon({ url, logoUrl, size = 20, className }: SiteFaviconProps) {
+  // Two-stage fallback: extracted logo → Google favicon → Globe icon
+  const [primaryFailed, setPrimaryFailed] = useState(false)
+  const [fallbackFailed, setFallbackFailed] = useState(false)
 
-  if (failed) {
-    return <Globe className={cn("text-primary", className)} style={{ width: size, height: size }} />
+  const domain = getDomain(url)
+  const googleFavicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+
+  if (fallbackFailed || (!logoUrl && primaryFailed)) {
+    return (
+      <Globe
+        className={cn("text-primary", className)}
+        style={{ width: size, height: size }}
+      />
+    )
   }
+
+  const src = logoUrl && !primaryFailed ? logoUrl : googleFavicon
 
   return (
     <img
-      src={`https://icons.duckduckgo.com/ip3/${domain}.ico`}
+      src={src}
       alt=""
       width={size}
       height={size}
-      className={cn("rounded-sm", className)}
-      onError={() => setFailed(true)}
+      className={cn("rounded-sm object-contain", className)}
+      style={{ width: size, height: size }}
+      onError={() => {
+        if (logoUrl && !primaryFailed) {
+          setPrimaryFailed(true)
+        } else {
+          setFallbackFailed(true)
+        }
+      }}
     />
   )
 }

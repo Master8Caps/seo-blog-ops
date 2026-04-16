@@ -12,13 +12,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { ArrowLeft, Save } from "lucide-react"
-import Link from "next/link"
-import { buttonVariants } from "@/components/ui/button"
+import { Save, RefreshCw, Loader2 } from "lucide-react"
 import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
-import { updateSite } from "@/modules/sites/actions/update-site"
+import { updateSite, reextractLogo } from "@/modules/sites/actions/update-site"
 import { deleteSite } from "@/modules/sites/actions/delete-site"
 import { LoadingSpinner } from "@/components/shared/loading-spinner"
+import { SiteFavicon } from "@/components/shared/site-favicon"
 
 export default function EditSitePage() {
   const router = useRouter()
@@ -26,11 +25,15 @@ export default function EditSitePage() {
   const siteSlug = params.siteSlug as string
 
   const [siteId, setSiteId] = useState("")
+  const [siteUrl, setSiteUrl] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [reextracting, setReextracting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [logoMsg, setLogoMsg] = useState<string | null>(null)
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
+  const [logoUrl, setLogoUrl] = useState("")
   const [niche, setNiche] = useState("")
   const [audience, setAudience] = useState("")
   const [tone, setTone] = useState("")
@@ -44,8 +47,10 @@ export default function EditSitePage() {
         return
       }
       setSiteId(site.id)
+      setSiteUrl(site.url)
       setName(site.name)
       setDescription(site.description ?? "")
+      setLogoUrl(site.logoUrl ?? "")
       setNiche(site.niche ?? "")
       setAudience(site.audience ?? "")
       setTone(site.tone ?? "")
@@ -65,6 +70,7 @@ export default function EditSitePage() {
         id: siteId,
         name,
         description: description || undefined,
+        logoUrl: logoUrl.trim() ? logoUrl.trim() : null,
         niche: niche || undefined,
         audience: audience || undefined,
         tone: tone || undefined,
@@ -85,6 +91,19 @@ export default function EditSitePage() {
       return
     }
     await deleteSite(siteId)
+  }
+
+  async function handleReextractLogo() {
+    setReextracting(true)
+    setLogoMsg(null)
+    const result = await reextractLogo(siteId)
+    if (result.success && result.logoUrl) {
+      setLogoUrl(result.logoUrl)
+      setLogoMsg("Logo re-detected from site.")
+    } else {
+      setLogoMsg(result.error ?? "Could not detect a logo.")
+    }
+    setReextracting(false)
   }
 
   if (loading) {
@@ -123,6 +142,50 @@ export default function EditSitePage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="logoUrl">Logo</Label>
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-md border bg-muted/30 shrink-0">
+                  <SiteFavicon
+                    url={siteUrl}
+                    logoUrl={logoUrl || null}
+                    size={40}
+                  />
+                </div>
+                <div className="flex-1 space-y-1.5">
+                  <Input
+                    id="logoUrl"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="https://example.com/logo.svg"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleReextractLogo}
+                      disabled={reextracting}
+                    >
+                      {reextracting ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      )}
+                      <span className="ml-1.5">Re-detect from site</span>
+                    </Button>
+                    {logoMsg && (
+                      <span className="text-xs text-muted-foreground">{logoMsg}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Auto-detected during onboarding. Paste a direct URL to override, or leave
+                blank to fall back to the site&apos;s favicon.
+              </p>
             </div>
           </CardContent>
 

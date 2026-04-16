@@ -5,9 +5,13 @@ import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/db/prisma"
 import { decrypt } from "@/lib/crypto"
 import {
-  uploadMedia,
+  uploadMedia as wpUploadMedia,
   createPost as wpCreatePost,
 } from "@/modules/publishing/services/wordpress"
+import {
+  publishArticle as apiPublishArticle,
+  uploadMedia as apiUploadMedia,
+} from "@/modules/publishing/services/standard-api"
 import { classifyPost } from "@/modules/publishing/services/classify-post"
 
 interface PublishResult {
@@ -16,9 +20,6 @@ interface PublishResult {
   publishedUrl?: string
 }
 
-/**
- * Update the job's payload with a progress step.
- */
 async function updateJobProgress(jobId: string | undefined, step: string) {
   if (!jobId) return
   await prisma.jobQueue.update({
@@ -28,8 +29,7 @@ async function updateJobProgress(jobId: string | undefined, step: string) {
 }
 
 /**
- * Publish a post to WordPress. Handles image upload, taxonomy classification,
- * and post creation.
+ * Publish a post. Routes to the correct adapter based on site.publishType.
  */
 export async function publishPost(
   postId: string,
@@ -44,10 +44,131 @@ export async function publishPost(
   if (post.status === "published") return { success: false, error: "Post is already published" }
 
   const site = post.site
-  if (site.publishType !== "wordpress") {
-    return { success: false, error: "WordPress publishing not configured for this site" }
+
+  if (site.publishType === "wordpress") {
+    return publishToWordPress(post, site, jobId)
   }
 
+  if (site.publishType === "api") {
+    return publishToStandardApi(post, site, jobId)
+  }
+
+  return { success: false, error: `Publishing not configured for this site (type: ${site.publishType ?? "none"})` }
+}
+
+// ---------------------------------------------------------------------------
+// Standard API publish flow
+// ---------------------------------------------------------------------------
+
+async function publishToStandardApi(
+  post: { id: string; title: string; slug: string; content: string; excerpt: string | null; featuredImg: string | null; category: string | null; tags: string | null },
+  site: { id: string; slug: string; url: string; publishConfig: unknown },
+  jobId?: string
+): Promise<PublishResult> {
+  const config = site.publishConfig as Record<string, unknown>
+  if (!config?.apiKey) {
+    return { success: false, error: "API key not configured for this site" }
+  }
+
+  const apiKey = decrypt(config.apiKey as string)
+  const publishAsDraft = (config.publishAsDraft as boolean) ?? false
+  const taxonomy = config.taxonomy as {
+    categories: { slug: string; name: string }[]
+    tags: string[]
+    context: { label: string; description: string; items: { slug: string; name: string }[] }[]
+  } | undefined
+
+  try {
+    // Step 1: Classify post into site taxonomy
+    let category = post.category
+    let tags = post.tags
+
+    if (taxonomy && taxonomy.categories.length > 0 && !category) {
+      await updateJobProgress(jobId, "Classifying post into site taxonomy...")
+
+      const contextStr = taxonomy.context
+        ?.map((g) => `${g.label}: ${g.items.map((i) => i.name).join(", ")}`)
+        .join("\n")
+
+      const tagOptions = taxonomy.tags.map((t) => ({ slug: t, name: t }))
+      const classification = await classifyPost(
+        post.title,
+        post.content,
+        taxonomy.categories,
+        tagOptions,
+        contextStr
+      )
+      category = classification.category
+      tags = classification.tags.join(",")
+
+      await prisma.post.update({
+        where: { id: post.id },
+        data: { category, tags },
+      })
+    }
+
+    // Step 2: Upload featured image if the site supports it
+    let featuredImageUrl = post.featuredImg
+
+    if (post.featuredImg) {
+      await updateJobProgress(jobId, "Uploading featured image...")
+      try {
+        const imgRes = await fetch(post.featuredImg)
+        if (imgRes.ok) {
+          const imgBuffer = Buffer.from(await imgRes.arrayBuffer())
+          const filename = `${post.slug}-featured.png`
+          featuredImageUrl = await apiUploadMedia(site.url, apiKey, imgBuffer, filename)
+        }
+      } catch (error) {
+        console.error("Featured image upload failed, using original URL:", error)
+      }
+    }
+
+    // Step 3: Convert markdown to HTML and publish
+    await updateJobProgress(jobId, "Publishing article...")
+    const htmlContent = markdownToHtml(post.content)
+
+    const result = await apiPublishArticle(site.url, apiKey, {
+      slug: post.slug,
+      title: post.title,
+      content: htmlContent,
+      excerpt: post.excerpt ?? undefined,
+      category: category ?? undefined,
+      featuredImage: featuredImageUrl ?? undefined,
+      tags: tags ?? undefined,
+      published: !publishAsDraft,
+    })
+
+    // Step 4: Update our post record
+    await prisma.post.update({
+      where: { id: post.id },
+      data: {
+        status: "published",
+        externalId: result.slug,
+        publishedUrl: result.publishedUrl,
+        publishedAt: new Date(),
+      },
+    })
+
+    revalidatePaths(post.id, site.slug)
+    return { success: true, publishedUrl: result.publishedUrl }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Publishing failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// WordPress publish flow
+// ---------------------------------------------------------------------------
+
+async function publishToWordPress(
+  post: { id: string; title: string; slug: string; content: string; featuredImg: string | null; category: string | null; tags: string | null },
+  site: { id: string; slug: string; url: string; publishConfig: unknown },
+  jobId?: string
+): Promise<PublishResult> {
   const config = site.publishConfig as Record<string, unknown>
   if (!config?.wpUsername || !config?.wpAppPassword) {
     return { success: false, error: "WordPress credentials not found" }
@@ -57,44 +178,40 @@ export async function publishPost(
   const wpPassword = decrypt(config.wpAppPassword as string)
   const wpPublishAsDraft = (config.wpPublishAsDraft as boolean) ?? false
   const taxonomy = config.taxonomy as {
-    categories: { id: number; name: string }[]
-    tags: { id: number; name: string }[]
+    categories: { id: number; name: string; slug: string }[]
+    tags: { id: number; name: string; slug: string }[]
   } | undefined
 
   try {
     // Step 1: Classify post into WordPress taxonomy
-    let categoryId: number | undefined
-    let tagIds: number[] = []
+    let categorySlug = post.category
+    let tagSlugs = post.tags?.split(",").map((t) => t.trim()).filter(Boolean) ?? []
 
-    if (taxonomy && taxonomy.categories.length > 0) {
+    if (taxonomy && taxonomy.categories.length > 0 && !categorySlug) {
       await updateJobProgress(jobId, "Classifying post into WordPress taxonomy...")
 
-      // Use existing classification if already set, otherwise run AI
-      if (post.wpCategoryId) {
-        categoryId = post.wpCategoryId
-        tagIds = (post.wpTagIds as number[]) ?? []
-      } else {
-        const classification = await classifyPost(
-          post.title,
-          post.content,
-          taxonomy.categories,
-          taxonomy.tags
-        )
-        categoryId = classification.categoryId
-        tagIds = classification.tagIds
+      const catOptions = taxonomy.categories.map((c) => ({ slug: c.slug, name: c.name }))
+      const tagOptions = taxonomy.tags.map((t) => ({ slug: t.slug, name: t.name }))
+      const classification = await classifyPost(post.title, post.content, catOptions, tagOptions)
+      categorySlug = classification.category
+      tagSlugs = classification.tags
 
-        // Save classification to post
-        await prisma.post.update({
-          where: { id: postId },
-          data: {
-            wpCategoryId: categoryId,
-            wpTagIds: tagIds,
-          },
-        })
-      }
+      await prisma.post.update({
+        where: { id: post.id },
+        data: {
+          category: categorySlug,
+          tags: tagSlugs.join(","),
+        },
+      })
     }
 
-    // Step 2: Upload featured image if exists
+    // Resolve slugs → integer IDs from cached taxonomy
+    const categoryId = taxonomy?.categories.find((c) => c.slug === categorySlug)?.id
+    const tagIds = tagSlugs
+      .map((slug) => taxonomy?.tags.find((t) => t.slug === slug)?.id)
+      .filter((id): id is number => id !== undefined)
+
+    // Step 2: Upload featured image
     let featuredMediaId: number | undefined
 
     if (post.featuredImg) {
@@ -104,7 +221,7 @@ export async function publishPost(
         if (imgRes.ok) {
           const imgBuffer = Buffer.from(await imgRes.arrayBuffer())
           const filename = `${post.slug}-featured.png`
-          const media = await uploadMedia(site.url, wpUsername, wpPassword, imgBuffer, filename)
+          const media = await wpUploadMedia(site.url, wpUsername, wpPassword, imgBuffer, filename)
           featuredMediaId = media.id
         }
       } catch (error) {
@@ -112,11 +229,10 @@ export async function publishPost(
       }
     }
 
-    // Step 3: Convert markdown to HTML for WordPress
+    // Step 3: Convert markdown to HTML and publish
     await updateJobProgress(jobId, "Publishing post to WordPress...")
-    const htmlContent = markdownToWordPressHtml(post.content)
+    const htmlContent = markdownToHtml(post.content)
 
-    // Step 4: Create the post on WordPress
     const wpPost = await wpCreatePost(site.url, wpUsername, wpPassword, {
       title: post.title,
       content: htmlContent,
@@ -126,9 +242,9 @@ export async function publishPost(
       tags: tagIds.length > 0 ? tagIds : undefined,
     })
 
-    // Step 5: Update our post record
+    // Step 4: Update our post record
     await prisma.post.update({
-      where: { id: postId },
+      where: { id: post.id },
       data: {
         status: "published",
         externalId: String(wpPost.id),
@@ -137,10 +253,7 @@ export async function publishPost(
       },
     })
 
-    revalidatePath(`/content/${postId}`)
-    revalidatePath(`/sites/${site.slug}/content`)
-    revalidatePath("/content")
-
+    revalidatePaths(post.id, site.slug)
     return { success: true, publishedUrl: wpPost.link }
   } catch (error) {
     return {
@@ -150,28 +263,29 @@ export async function publishPost(
   }
 }
 
-/**
- * Convert markdown content to WordPress-compatible HTML.
- */
-function markdownToWordPressHtml(md: string): string {
+// ---------------------------------------------------------------------------
+// Shared utilities
+// ---------------------------------------------------------------------------
+
+function revalidatePaths(postId: string, siteSlug: string) {
+  revalidatePath(`/content/${postId}`)
+  revalidatePath(`/sites/${siteSlug}/content`)
+  revalidatePath("/content")
+}
+
+function markdownToHtml(md: string): string {
   return md
-    // Images
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />')
-    // Headings
     .replace(/^### (.+)$/gm, "<h3>$1</h3>")
     .replace(/^## (.+)$/gm, "<h2>$1</h2>")
     .replace(/^# (.+)$/gm, "<h1>$1</h1>")
-    // Bold and italic
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    // Lists
     .replace(/^- (.+)$/gm, "<li>$1</li>")
     .replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`)
-    // Paragraphs — double newlines become paragraph breaks
     .replace(/\n\n/g, "</p>\n<p>")
     .replace(/^/, "<p>")
     .replace(/$/, "</p>")
-    // Clean up empty paragraphs around block elements
     .replace(/<p>(<h[1-3]>)/g, "$1")
     .replace(/(<\/h[1-3]>)<\/p>/g, "$1")
     .replace(/<p>(<ul>)/g, "$1")

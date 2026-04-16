@@ -34,7 +34,7 @@ export async function approvePost(postId: string, approvedBy: string) {
   // Auto-publish if site has it enabled
   const config = post.site.publishConfig as Record<string, unknown> | null
   if (
-    post.site.publishType === "wordpress" &&
+    post.site.publishType &&
     config?.autoPublishOnApproval === true
   ) {
     await queuePostPublish(postId)

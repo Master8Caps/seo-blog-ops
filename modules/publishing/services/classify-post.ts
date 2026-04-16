@@ -5,22 +5,23 @@ import { anthropic } from "@/lib/ai/client"
 import { parseAIJson } from "@/lib/ai/parse-json"
 
 interface TaxonomyOption {
-  id: number
+  slug: string
   name: string
 }
 
 interface ClassificationResult {
-  categoryId: number
-  tagIds: number[]
+  category: string
+  tags: string[]
 }
 
 export async function classifyPost(
   postTitle: string,
   postContent: string,
   categories: TaxonomyOption[],
-  tags: TaxonomyOption[]
+  tags: TaxonomyOption[],
+  siteContext?: string
 ): Promise<ClassificationResult> {
-  const prompt = `You are classifying a blog post into an existing WordPress taxonomy.
+  const prompt = `You are classifying a blog post into a site's taxonomy.
 
 POST TITLE: ${postTitle}
 
@@ -28,18 +29,20 @@ POST CONTENT (first 2000 chars):
 ${postContent.slice(0, 2000)}
 
 AVAILABLE CATEGORIES:
-${categories.map((c) => `- ID ${c.id}: ${c.name}`).join("\n")}
+${categories.map((c) => `- ${c.slug}: ${c.name}`).join("\n")}
 
 AVAILABLE TAGS:
-${tags.map((t) => `- ID ${t.id}: ${t.name}`).join("\n")}
+${tags.map((t) => (typeof t === "string" ? `- ${t}` : `- ${t.slug}: ${t.name}`)).join("\n")}
+${siteContext ? `\nSITE CONTEXT:\n${siteContext}` : ""}
 
-Pick the SINGLE best matching category and 2-4 most relevant tags from the lists above.
-Only use IDs that exist in the lists. Do not suggest new categories or tags.
+Pick the SINGLE best matching category slug and 2-4 most relevant tag slugs from the lists above.
+Only use slugs that exist in the lists. Do not suggest new categories or tags.
 
 Respond in JSON:
 {
-  "categoryId": <number>,
-  "tagIds": [<number>, ...]}`
+  "category": "<category-slug>",
+  "tags": ["<tag-slug>", ...]
+}`
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
@@ -54,16 +57,17 @@ Respond in JSON:
 
   const result = parseAIJson<ClassificationResult>(textBlock.text) as ClassificationResult
 
-  // Validate returned IDs exist in the provided lists
-  const validCatIds = new Set(categories.map((c) => c.id))
-  const validTagIds = new Set(tags.map((t) => t.id))
+  // Validate returned slugs exist in the provided lists
+  const validCatSlugs = new Set(categories.map((c) => c.slug))
+  const validTagSlugs = new Set(
+    tags.map((t) => (typeof t === "string" ? t : t.slug))
+  )
 
-  if (!validCatIds.has(result.categoryId)) {
-    // Fallback to first category
-    result.categoryId = categories[0]?.id ?? 1
+  if (!validCatSlugs.has(result.category)) {
+    result.category = categories[0]?.slug ?? ""
   }
 
-  result.tagIds = result.tagIds.filter((id) => validTagIds.has(id))
+  result.tags = result.tags.filter((slug) => validTagSlugs.has(slug))
 
   return result
 }

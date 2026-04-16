@@ -1,6 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/db/prisma"
+import { reapStaleJobs } from "../services/queue-recovery"
 
 interface QueueResult {
   success: boolean
@@ -13,6 +14,9 @@ interface QueueResult {
  * happens in the background via /api/queue/process.
  */
 export async function queuePostGeneration(siteId: string): Promise<QueueResult> {
+  // Self-heal before checking — prevents orphaned jobs from blocking forever
+  await reapStaleJobs()
+
   // Check site has approved keywords
   const keywordCount = await prisma.keyword.count({
     where: { siteId, status: "approved" },
@@ -67,6 +71,8 @@ export async function queuePostGeneration(siteId: string): Promise<QueueResult> 
  * happens in the background via /api/queue/process.
  */
 export async function queuePostPublish(postId: string): Promise<QueueResult> {
+  await reapStaleJobs()
+
   const post = await prisma.post.findUnique({
     where: { id: postId },
     include: { site: true },
@@ -74,8 +80,8 @@ export async function queuePostPublish(postId: string): Promise<QueueResult> {
 
   if (!post) return { success: false, error: "Post not found" }
   if (post.status === "published") return { success: false, error: "Post is already published" }
-  if (post.site.publishType !== "wordpress") {
-    return { success: false, error: "WordPress publishing not configured for this site" }
+  if (!post.site.publishType) {
+    return { success: false, error: "Publishing not configured for this site" }
   }
 
   // Check for existing pending/processing publish job for this post

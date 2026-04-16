@@ -16,15 +16,22 @@ import {
   Loader2,
   CheckCircle2,
   RefreshCw,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react"
 import { LoadingSpinner } from "@/components/shared/loading-spinner"
 import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
 import {
   testAndSyncConnection,
+  testAndSyncApiConnection,
   updatePublishingSettings,
   resyncTaxonomy,
+  resyncApiMetadata,
   getPublishingConfig,
+  disconnectPublishing,
 } from "@/modules/publishing/actions/connect-site"
+
+type Platform = "api" | "wordpress" | null
 
 export default function PublishingSettingsPage() {
   const params = useParams()
@@ -32,26 +39,34 @@ export default function PublishingSettingsPage() {
 
   const [siteId, setSiteId] = useState("")
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [resyncing, setResyncing] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  // Form state
+  // Platform selection
+  const [platform, setPlatform] = useState<Platform>(null)
+
+  // Standard API form state
+  const [apiKey, setApiKey] = useState("")
+
+  // WordPress form state
   const [wpUsername, setWpUsername] = useState("")
   const [wpPassword, setWpPassword] = useState("")
 
   // Config state
   const [isConnected, setIsConnected] = useState(false)
-  const [wpPublishAsDraft, setWpPublishAsDraft] = useState(false)
+  const [publishAsDraft, setPublishAsDraft] = useState(false)
   const [autoPublishOnApproval, setAutoPublishOnApproval] = useState(false)
   const [taxonomy, setTaxonomy] = useState<{
-    categories: { id: number; name: string }[]
-    tags: { id: number; name: string }[]
+    categories: { slug: string; name: string }[]
+    tags: string[] | { slug: string; name: string }[]
+    context?: { label: string; description: string; items: { slug: string; name: string }[] }[]
     lastSyncedAt: string
   } | null>(null)
   const [connectedUser, setConnectedUser] = useState("")
+  const [contextExpanded, setContextExpanded] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -61,20 +76,52 @@ export default function PublishingSettingsPage() {
 
       const config = await getPublishingConfig(site.id)
       if (config) {
+        setPlatform((config.publishType as Platform) ?? null)
         setWpUsername(config.wpUsername)
-        setIsConnected(config.isConnected)
-        setWpPublishAsDraft(config.wpPublishAsDraft)
+        setIsConnected(config.isWpConnected || config.isApiConnected)
+        setPublishAsDraft(
+          config.publishType === "wordpress"
+            ? config.wpPublishAsDraft
+            : config.publishAsDraft
+        )
         setAutoPublishOnApproval(config.autoPublishOnApproval)
-        if (config.taxonomy) {
-          setTaxonomy(config.taxonomy)
-        }
+        if (config.taxonomy) setTaxonomy(config.taxonomy)
       }
       setLoading(false)
     }
     load()
   }, [siteSlug])
 
-  async function handleTestConnection() {
+  async function handleTestApiConnection() {
+    if (!apiKey) {
+      setError("API key is required")
+      return
+    }
+    setTesting(true)
+    setError(null)
+    setSuccessMsg(null)
+
+    const result = await testAndSyncApiConnection(siteId, apiKey)
+
+    if (!result.success) {
+      setError(result.error ?? "Connection failed")
+      setTesting(false)
+      return
+    }
+
+    setIsConnected(true)
+    setSuccessMsg(
+      `Connected! Synced ${result.categoryCount} categories, ${result.tagCount} tags, and ${result.contextGroupCount} context groups.`
+    )
+    setApiKey("")
+
+    const config = await getPublishingConfig(siteId)
+    if (config?.taxonomy) setTaxonomy(config.taxonomy)
+
+    setTesting(false)
+  }
+
+  async function handleTestWpConnection() {
     if (!wpUsername || !wpPassword) {
       setError("Username and application password are required")
       return
@@ -96,9 +143,8 @@ export default function PublishingSettingsPage() {
     setSuccessMsg(
       `Connected successfully! Synced ${result.categoryCount} categories and ${result.tagCount} tags.`
     )
-    setWpPassword("") // Clear password from form after saving encrypted
+    setWpPassword("")
 
-    // Refresh config to get taxonomy
     const config = await getPublishingConfig(siteId)
     if (config?.taxonomy) setTaxonomy(config.taxonomy)
 
@@ -109,11 +155,15 @@ export default function PublishingSettingsPage() {
     setResyncing(true)
     setError(null)
 
-    const result = await resyncTaxonomy(siteId)
+    const result = platform === "wordpress"
+      ? await resyncTaxonomy(siteId)
+      : await resyncApiMetadata(siteId)
+
     if (!result.success) {
       setError(result.error ?? "Re-sync failed")
     } else {
-      setSuccessMsg(`Re-synced ${result.categoryCount} categories and ${result.tagCount} tags.`)
+      const contextCount = "contextGroupCount" in result ? `, ${result.contextGroupCount} context groups` : ""
+      setSuccessMsg(`Re-synced ${result.categoryCount} categories and ${result.tagCount} tags${contextCount}.`)
       const config = await getPublishingConfig(siteId)
       if (config?.taxonomy) setTaxonomy(config.taxonomy)
     }
@@ -122,17 +172,36 @@ export default function PublishingSettingsPage() {
   }
 
   async function handleToggle(
-    field: "wpPublishAsDraft" | "autoPublishOnApproval",
+    field: "publishAsDraft" | "wpPublishAsDraft" | "autoPublishOnApproval",
     value: boolean
   ) {
     setSaving(true)
     await updatePublishingSettings(siteId, { [field]: value })
 
-    if (field === "wpPublishAsDraft") setWpPublishAsDraft(value)
+    if (field === "publishAsDraft" || field === "wpPublishAsDraft") setPublishAsDraft(value)
     if (field === "autoPublishOnApproval") setAutoPublishOnApproval(value)
 
     setSaving(false)
   }
+
+  async function handleSwitchPlatform(newPlatform: Platform) {
+    if (isConnected && newPlatform !== platform) {
+      // Disconnect existing before switching
+      await disconnectPublishing(siteId)
+      setIsConnected(false)
+      setTaxonomy(null)
+      setSuccessMsg(null)
+      setError(null)
+    }
+    setPlatform(newPlatform)
+  }
+
+  const draftToggleField = platform === "wordpress" ? "wpPublishAsDraft" : "publishAsDraft"
+  const tagCount = taxonomy
+    ? Array.isArray(taxonomy.tags)
+      ? taxonomy.tags.length
+      : 0
+    : 0
 
   if (loading) return <LoadingSpinner message="Loading publishing settings..." />
 
@@ -144,89 +213,164 @@ export default function PublishingSettingsPage() {
           Publishing Platform
         </Label>
         <div className="flex gap-2 mt-2">
-          <div className="px-4 py-2.5 rounded-lg border-2 border-primary bg-primary/10 text-primary text-sm font-semibold">
+          <button
+            type="button"
+            onClick={() => handleSwitchPlatform("api")}
+            className={`px-4 py-2.5 rounded-lg border-2 text-sm font-semibold transition-colors ${
+              platform === "api"
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+            }`}
+          >
+            Standard API
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSwitchPlatform("wordpress")}
+            className={`px-4 py-2.5 rounded-lg border-2 text-sm font-semibold transition-colors ${
+              platform === "wordpress"
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+            }`}
+          >
             WordPress
-          </div>
-          <div className="px-4 py-2.5 rounded-lg border border-border text-muted-foreground text-sm opacity-50 cursor-not-allowed">
-            Manus (Coming Soon)
-          </div>
-          <div className="px-4 py-2.5 rounded-lg border border-border text-muted-foreground text-sm opacity-50 cursor-not-allowed">
-            Custom API (Coming Soon)
-          </div>
+          </button>
         </div>
+        {platform === "api" && (
+          <p className="text-xs text-muted-foreground mt-2">
+            For Manus sites, Claude-built Vercel sites, or any site with the standard publish API.
+          </p>
+        )}
       </div>
 
-      {/* Connection card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>WordPress Connection</CardTitle>
-          <CardDescription>
-            We recommend creating a dedicated WordPress user (e.g. &quot;SEO Blog Ops&quot;)
-            with the <strong>Editor</strong> role, then generating an Application Password
-            under that user&apos;s profile. Found in WordPress → Users → Profile → Application Passwords.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="wp-username">WordPress Username</Label>
-            <Input
-              id="wp-username"
-              placeholder="e.g. seo-blog-ops"
-              value={wpUsername}
-              onChange={(e) => setWpUsername(e.target.value)}
-              disabled={testing}
-            />
-          </div>
+      {/* Standard API connection card */}
+      {platform === "api" && !isConnected && (
+        <Card>
+          <CardHeader>
+            <CardTitle>API Connection</CardTitle>
+            <CardDescription>
+              Enter the API key for this site. Each site has a unique key configured
+              in its environment secrets as <code className="text-xs">BLOG_PUBLISH_API_KEY</code>.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="api-key">API Key</Label>
+              <Input
+                id="api-key"
+                type="password"
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                disabled={testing}
+              />
+              <p className="text-xs text-muted-foreground">
+                The UUID configured in the site&apos;s secrets
+              </p>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="wp-password">Application Password</Label>
-            <Input
-              id="wp-password"
-              type="password"
-              placeholder={isConnected ? "••••••••••••••••" : "xxxx xxxx xxxx xxxx xxxx xxxx"}
-              value={wpPassword}
-              onChange={(e) => setWpPassword(e.target.value)}
-              disabled={testing}
-            />
-            <p className="text-xs text-muted-foreground">
-              Found in WordPress → Users → Profile → Application Passwords
-            </p>
-          </div>
+            <Button onClick={handleTestApiConnection} disabled={testing}>
+              {testing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                "Test Connection & Sync Metadata"
+              )}
+            </Button>
 
-          <Button onClick={handleTestConnection} disabled={testing}>
-            {testing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Testing...
-              </>
-            ) : (
-              "Test Connection & Sync Taxonomy"
+            {error && (
+              <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+                {error}
+              </div>
             )}
-          </Button>
+            {successMsg && (
+              <div className="rounded-md bg-primary/15 p-3 text-sm text-primary">
+                {successMsg}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
-          {error && (
-            <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
-              {error}
+      {/* WordPress connection card */}
+      {platform === "wordpress" && !isConnected && (
+        <Card>
+          <CardHeader>
+            <CardTitle>WordPress Connection</CardTitle>
+            <CardDescription>
+              We recommend creating a dedicated WordPress user (e.g. &quot;SEO Blog Ops&quot;)
+              with the <strong>Editor</strong> role, then generating an Application Password
+              under that user&apos;s profile. Found in WordPress → Users → Profile → Application Passwords.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="wp-username">WordPress Username</Label>
+              <Input
+                id="wp-username"
+                placeholder="e.g. seo-blog-ops"
+                value={wpUsername}
+                onChange={(e) => setWpUsername(e.target.value)}
+                disabled={testing}
+              />
             </div>
-          )}
-          {successMsg && (
-            <div className="rounded-md bg-primary/15 p-3 text-sm text-primary">
-              {successMsg}
+
+            <div className="space-y-2">
+              <Label htmlFor="wp-password">Application Password</Label>
+              <Input
+                id="wp-password"
+                type="password"
+                placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
+                value={wpPassword}
+                onChange={(e) => setWpPassword(e.target.value)}
+                disabled={testing}
+              />
+              <p className="text-xs text-muted-foreground">
+                Found in WordPress → Users → Profile → Application Passwords
+              </p>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            <Button onClick={handleTestWpConnection} disabled={testing}>
+              {testing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                "Test Connection & Sync Taxonomy"
+              )}
+            </Button>
+
+            {error && (
+              <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+            {successMsg && (
+              <div className="rounded-md bg-primary/15 p-3 text-sm text-primary">
+                {successMsg}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Connection status */}
       {isConnected && (
         <div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3">
           <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-green-500">Connected</p>
+            <p className="text-sm font-medium text-green-500">
+              Connected{connectedUser ? ` as ${connectedUser}` : ""}
+            </p>
             <p className="text-xs text-muted-foreground">
               {taxonomy
-                ? `${taxonomy.categories.length} categories · ${taxonomy.tags.length} tags · Last synced: ${new Date(taxonomy.lastSyncedAt).toLocaleDateString()}`
-                : "Taxonomy synced"}
+                ? `${taxonomy.categories.length} categories · ${tagCount} tags${
+                    taxonomy.context?.length ? ` · ${taxonomy.context.length} context groups` : ""
+                  } · Last synced: ${new Date(taxonomy.lastSyncedAt).toLocaleDateString()}`
+                : "Metadata synced"}
             </p>
           </div>
           <Button
@@ -239,6 +383,52 @@ export default function PublishingSettingsPage() {
             <span className="ml-1.5">Re-sync</span>
           </Button>
         </div>
+      )}
+
+      {/* Site context preview (Standard API only) */}
+      {isConnected && platform === "api" && taxonomy?.context && taxonomy.context.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <button
+              type="button"
+              onClick={() => setContextExpanded(!contextExpanded)}
+              className="flex items-center gap-2 w-full text-left"
+            >
+              {contextExpanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+              <CardTitle className="text-base">Site Context</CardTitle>
+              <span className="text-xs text-muted-foreground ml-auto">
+                {taxonomy.context.length} group{taxonomy.context.length !== 1 ? "s" : ""}
+              </span>
+            </button>
+            <CardDescription className="ml-6">
+              Context data from this site, used by AI to generate more targeted content.
+            </CardDescription>
+          </CardHeader>
+          {contextExpanded && (
+            <CardContent className="space-y-4 pt-0">
+              {taxonomy.context.map((group) => (
+                <div key={group.label} className="space-y-1">
+                  <p className="text-sm font-medium">{group.label}</p>
+                  <p className="text-xs text-muted-foreground">{group.description}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {group.items.map((item) => (
+                      <span
+                        key={item.slug}
+                        className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs"
+                      >
+                        {item.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          )}
+        </Card>
       )}
 
       {/* Publishing options */}
@@ -277,30 +467,39 @@ export default function PublishingSettingsPage() {
 
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">Publish as draft in WordPress</p>
+                <p className="text-sm font-medium">Publish as draft</p>
                 <p className="text-xs text-muted-foreground">
-                  Posts appear in WP admin but aren&apos;t public until you manually publish in WordPress
+                  {platform === "wordpress"
+                    ? "Posts appear in WP admin but aren't public until you manually publish in WordPress"
+                    : "Articles are created with published=false so they aren't live immediately"}
                 </p>
               </div>
               <button
                 type="button"
                 role="switch"
-                aria-checked={wpPublishAsDraft}
+                aria-checked={publishAsDraft}
                 disabled={saving}
-                onClick={() => handleToggle("wpPublishAsDraft", !wpPublishAsDraft)}
+                onClick={() => handleToggle(draftToggleField, !publishAsDraft)}
                 className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                  wpPublishAsDraft ? "bg-primary" : "bg-muted"
+                  publishAsDraft ? "bg-primary" : "bg-muted"
                 }`}
               >
                 <span
                   className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${
-                    wpPublishAsDraft ? "translate-x-5" : "translate-x-0"
+                    publishAsDraft ? "translate-x-5" : "translate-x-0"
                   }`}
                 />
               </button>
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* No platform selected */}
+      {!platform && (
+        <p className="text-sm text-muted-foreground">
+          Select a publishing platform above to configure how posts are published to this site.
+        </p>
       )}
     </div>
   )

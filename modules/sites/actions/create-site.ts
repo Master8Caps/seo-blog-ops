@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma"
 import { createSiteSchema, type CreateSiteInput } from "../schemas"
 import { crawlSite } from "../services/crawler"
 import { analyzeSite } from "../services/analyzer"
+import { extractLogoUrl } from "../services/logo-extractor"
 import { slugFromUrl } from "@/lib/utils/slug"
 
 interface CreateSiteResult {
@@ -81,11 +82,14 @@ export async function crawlAndAnalyzeSite(
       }
     }
 
-    const analysis = await analyzeSite({
-      url: site.url,
-      description: site.description ?? undefined,
-      pages: crawlResult.pages,
-    })
+    const [analysis, logoUrl] = await Promise.all([
+      analyzeSite({
+        url: site.url,
+        description: site.description ?? undefined,
+        pages: crawlResult.pages,
+      }),
+      extractLogoUrl(site.url),
+    ])
 
     await prisma.site.update({
       where: { id: siteId },
@@ -95,6 +99,7 @@ export async function crawlAndAnalyzeSite(
         tone: analysis.tone,
         topics: analysis.topics,
         seoProfile: JSON.parse(JSON.stringify(analysis)),
+        logoUrl: logoUrl ?? undefined,
         onboardingStatus: "analyzed",
         lastCrawledAt: new Date(),
       },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db/prisma"
 import { generatePost } from "@/modules/content/actions/generate-post"
 import { publishPost } from "@/modules/publishing/actions/publish-post"
+import { reapStaleJobs } from "@/modules/content/services/queue-recovery"
 
 export const maxDuration = 300
 
@@ -13,6 +14,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  // Self-heal: mark any jobs orphaned by a previous failed tick as failed
+  // so they don't block new work or hang "in-flight" forever.
+  const reaped = await reapStaleJobs()
+
   // Fetch next pending job
   const job = await prisma.jobQueue.findFirst({
     where: { status: "pending" },
@@ -20,7 +25,7 @@ export async function POST(request: NextRequest) {
   })
 
   if (!job) {
-    return NextResponse.json({ message: "No pending jobs" })
+    return NextResponse.json({ message: "No pending jobs", reaped })
   }
 
   // Mark as processing
@@ -99,5 +104,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     message: `Processed job ${job.id}`,
     remaining,
+    reaped,
   })
 }

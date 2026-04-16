@@ -7,6 +7,7 @@ interface SiteCardProps {
   slug: string
   name: string
   url: string
+  logoUrl?: string | null
   niche?: string | null
   onboardingStatus: string
   autopilot: boolean
@@ -25,6 +26,7 @@ export function SiteCard({
   slug,
   name,
   url,
+  logoUrl,
   niche,
   onboardingStatus,
   autopilot,
@@ -40,7 +42,7 @@ export function SiteCard({
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <SiteFavicon url={url} size={40} className="rounded-md" />
+          <SiteFavicon url={url} logoUrl={logoUrl} size={40} className="rounded-md" />
           <div>
             <h3 className="font-semibold group-hover:text-primary transition-colors">
               {name}
