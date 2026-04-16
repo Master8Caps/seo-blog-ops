@@ -5,10 +5,6 @@ import { prisma } from "@/lib/db/prisma"
 import { reapStaleJobs } from "../services/queue-recovery"
 import { processNextJob } from "../services/process-queue"
 
-// Allow the processor (which runs AFTER this response via after()) to use
-// the full generation time budget on Vercel Pro.
-export const maxDuration = 300
-
 interface QueueResult {
   success: boolean
   jobId?: string

@@ -4,6 +4,10 @@ import { Sidebar } from "@/components/shared/sidebar"
 import { Header } from "@/components/shared/header"
 import { getActiveJobCount } from "@/modules/content/actions/get-activity"
 
+// Covers long-running server actions (content generation ≈2-3m, publishing)
+// invoked from any page under (app). Vercel Pro max is 900s; 300 is plenty.
+export const maxDuration = 300
+
 export default async function AppLayout({
   children,
 }: {

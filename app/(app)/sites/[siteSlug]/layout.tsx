@@ -6,7 +6,8 @@ import { LinkButton } from "@/components/shared/link-button"
 import { SiteFavicon } from "@/components/shared/site-favicon"
 import { SiteTabs } from "@/components/shared/site-tabs"
 
-export const maxDuration = 60
+// Covers server actions invoked from content/research children (generation, publishing)
+export const maxDuration = 300
 
 export default async function SiteLayout({
   children,

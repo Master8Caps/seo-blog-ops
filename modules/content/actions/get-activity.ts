@@ -6,8 +6,6 @@ import { prisma } from "@/lib/db/prisma"
 import { reapStaleJobs } from "../services/queue-recovery"
 import { processNextJob } from "../services/process-queue"
 
-export const maxDuration = 300
-
 export interface ActivityJob {
   id: string
   type: string

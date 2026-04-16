@@ -15,6 +15,7 @@ import {
 } from "./job-actions"
 
 export const dynamic = "force-dynamic"
+export const maxDuration = 300
 
 const jobTypeLabel: Record<string, string> = {
   generate: "Content generation",
