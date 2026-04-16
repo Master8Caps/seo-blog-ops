@@ -46,12 +46,21 @@ export default function SiteContentPage() {
 
   useEffect(() => {
     async function loadData() {
-      const site = await getSiteBySlug(siteSlug)
-      if (!site) return
-      setSiteId(site.id)
-      const sitePosts = await getPosts({ siteId: site.id })
-      setPosts(sitePosts)
-      setLoading(false)
+      try {
+        const site = await getSiteBySlug(siteSlug)
+        if (!site) {
+          setError(`Site not found: ${siteSlug}`)
+          setLoading(false)
+          return
+        }
+        setSiteId(site.id)
+        const sitePosts = await getPosts({ siteId: site.id })
+        setPosts(sitePosts)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load content")
+      } finally {
+        setLoading(false)
+      }
     }
     loadData()
   }, [siteSlug])

@@ -15,7 +15,8 @@ export default async function AppLayout({
     redirect("/login")
   }
 
-  const activeJobCount = await getActiveJobCount()
+  // Sidebar badge is nice-to-have — never let it break the app.
+  const activeJobCount = await getActiveJobCount().catch(() => 0)
 
   return (
     <div className="flex h-screen overflow-hidden">
