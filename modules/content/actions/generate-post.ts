@@ -168,12 +168,32 @@ export async function generatePost(
 
     // Step 5: Generate images via Gemini
     await updateJobProgress(jobId, "Generating images with Gemini...")
-    let images: Awaited<ReturnType<typeof generateAndUploadImages>> = []
+    let images: Awaited<ReturnType<typeof generateAndUploadImages>>["images"] = []
+    let imageErrors: string[] = []
     try {
-      images = await generateAndUploadImages(post.id, blog.imagePrompts)
+      const result = await generateAndUploadImages(post.id, blog.imagePrompts)
+      images = result.images
+      imageErrors = result.errors
     } catch (error) {
-      console.error("Image generation failed, continuing without images:", error)
+      imageErrors = [error instanceof Error ? error.message : "Unknown error"]
     }
+
+    if (imageErrors.length > 0) {
+      console.error("Image generation errors:", imageErrors)
+      // Surface on the job so /activity can show what went wrong
+      if (jobId) {
+        await prisma.jobQueue.update({
+          where: { id: jobId },
+          data: {
+            payload: {
+              step: "Finalizing post...",
+              imageErrors: imageErrors.join(" | "),
+            },
+          },
+        })
+      }
+    }
+
     finalContent = replaceImageMarkers(finalContent, images)
     // Strip any markers that didn't get resolved so previews don't render broken images
     finalContent = finalContent

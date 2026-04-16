@@ -12,6 +12,11 @@ export interface GeneratedImage {
   alt: string
 }
 
+export interface ImageGenerationResult {
+  images: GeneratedImage[]
+  errors: string[]
+}
+
 /** Create a Supabase client for storage (doesn't need cookies/auth context) */
 function createStorageClient() {
   return createClient(
@@ -24,41 +29,47 @@ function createStorageClient() {
  * Generate images via Gemini Pro Image and upload to Supabase Storage.
  * Returns public URLs for each generated image.
  */
+const GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image-preview"
+
 export async function generateAndUploadImages(
   postId: string,
   imagePrompts: ImagePrompt[]
-): Promise<GeneratedImage[]> {
+): Promise<ImageGenerationResult> {
   const apiKey = process.env.GOOGLE_AI_API_KEY
   if (!apiKey) {
-    throw new Error("GOOGLE_AI_API_KEY is not configured")
+    return {
+      images: [],
+      errors: ["GOOGLE_AI_API_KEY is not configured"],
+    }
   }
 
   const ai = new GoogleGenAI({ apiKey })
   const supabase = createStorageClient()
   const images: GeneratedImage[] = []
+  const errors: string[] = []
 
   for (const { section, prompt } of imagePrompts) {
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash-exp",
+        model: GEMINI_IMAGE_MODEL,
         contents: `Generate a professional, high-quality blog image: ${prompt}. Style: clean, modern, suitable for a professional blog post. No text overlays.`,
         config: {
-          responseModalities: ["IMAGE"],
+          // Gemini image generation requires both TEXT and IMAGE modalities
+          responseModalities: ["TEXT", "IMAGE"],
         },
       })
 
-      // Extract image data from response
       const parts = response.candidates?.[0]?.content?.parts ?? []
       const imagePart = parts.find(
         (p) => p.inlineData?.mimeType?.startsWith("image/")
       )
 
       if (!imagePart?.inlineData) {
-        console.error(`No image generated for section: ${section}`)
+        const reason = response.candidates?.[0]?.finishReason ?? "no image in response"
+        errors.push(`${section}: ${reason}`)
         continue
       }
 
-      // Upload to Supabase Storage
       const buffer = Buffer.from(imagePart.inlineData.data!, "base64")
       const ext = imagePart.inlineData.mimeType === "image/webp" ? "webp" : "png"
       const filePath = `posts/${postId}/${section}.${ext}`
@@ -71,7 +82,7 @@ export async function generateAndUploadImages(
         })
 
       if (uploadError) {
-        console.error(`Upload failed for ${section}:`, uploadError)
+        errors.push(`${section} upload: ${uploadError.message}`)
         continue
       }
 
@@ -85,12 +96,12 @@ export async function generateAndUploadImages(
         alt: prompt,
       })
     } catch (error) {
-      console.error(`Image generation failed for ${section}:`, error)
-      // Continue with other images — don't fail the whole post
+      const message = error instanceof Error ? error.message : "Unknown error"
+      errors.push(`${section}: ${message}`)
     }
   }
 
-  return images
+  return { images, errors }
 }
 
 /** Replace image markers in markdown with actual URLs */
