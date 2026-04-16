@@ -171,10 +171,14 @@ export async function generatePost(
     let images: Awaited<ReturnType<typeof generateAndUploadImages>> = []
     try {
       images = await generateAndUploadImages(post.id, blog.imagePrompts)
-      finalContent = replaceImageMarkers(finalContent, images)
     } catch (error) {
       console.error("Image generation failed, continuing without images:", error)
     }
+    finalContent = replaceImageMarkers(finalContent, images)
+    // Strip any markers that didn't get resolved so previews don't render broken images
+    finalContent = finalContent
+      .replace(/!\[featured\]\(IMAGE_FEATURED\)\s*\n?/g, "")
+      .replace(/!\[section\]\(IMAGE_[123]\)\s*\n?/g, "")
 
     // Step 6: Update post with humanized content + images
     await updateJobProgress(jobId, "Finalizing post...")
