@@ -1,7 +1,17 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
-const publicRoutes = ["/login", "/signup", "/api/auth/callback"]
+// Routes that must not be gated by Supabase auth.
+// - /login, /signup, /api/auth/callback: unauthenticated users need access
+// - /api/queue/process, /api/cron/weekly: server-to-server, protected by
+//   CRON_SECRET header inside the route itself (see those handlers)
+const publicRoutes = [
+  "/login",
+  "/signup",
+  "/api/auth/callback",
+  "/api/queue/process",
+  "/api/cron/weekly",
+]
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
