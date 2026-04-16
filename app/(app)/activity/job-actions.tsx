@@ -1,13 +1,47 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { RefreshCw, X, RotateCcw, Loader2 } from "lucide-react"
+import { RefreshCw, X, RotateCcw, Loader2, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   retryJob,
   clearStaleJobs,
   forceFailJob,
+  triggerProcessor,
 } from "@/modules/content/actions/get-activity"
+
+export function RunProcessorButton() {
+  const [pending, startTransition] = useTransition()
+  const [message, setMessage] = useState<string | null>(null)
+
+  return (
+    <div className="flex items-center gap-3">
+      <Button
+        size="sm"
+        variant="default"
+        disabled={pending}
+        onClick={() =>
+          startTransition(async () => {
+            const result = await triggerProcessor()
+            setMessage(
+              result.processed
+                ? "Job picked up — processing started."
+                : "No pending jobs to process."
+            )
+          })
+        }
+      >
+        {pending ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Play className="h-3.5 w-3.5" />
+        )}
+        <span className="ml-1.5">Run processor now</span>
+      </Button>
+      {message && <span className="text-xs text-muted-foreground">{message}</span>}
+    </div>
+  )
+}
 
 export function RetryButton({ jobId }: { jobId: string }) {
   const [pending, startTransition] = useTransition()

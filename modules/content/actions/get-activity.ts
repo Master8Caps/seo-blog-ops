@@ -1,8 +1,12 @@
 "use server"
 
+import { after } from "next/server"
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/db/prisma"
 import { reapStaleJobs } from "../services/queue-recovery"
+import { processNextJob } from "../services/process-queue"
+
+export const maxDuration = 300
 
 export interface ActivityJob {
   id: string
@@ -91,7 +95,6 @@ export async function retryJob(jobId: string): Promise<{
     return { success: false, error: "Only failed jobs can be retried" }
   }
 
-  // Reset to pending, preserve the original payload but clear error
   const payload = (job.payload ?? {}) as Record<string, unknown>
   delete payload.error
   delete payload.step
@@ -101,19 +104,39 @@ export async function retryJob(jobId: string): Promise<{
     data: { status: "pending", payload: payload as never },
   })
 
-  // Kick the processor
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000"
-  const cronSecret = process.env.CRON_SECRET
-
-  fetch(`${baseUrl}/api/queue/process`, {
-    method: "POST",
-    headers: cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {},
-  }).catch(() => {})
+  after(async () => {
+    let remaining = 1
+    while (remaining > 0) {
+      const result = await processNextJob()
+      if (!result.processed) break
+      remaining = result.remaining
+    }
+  })
 
   revalidatePath("/activity")
   return { success: true }
+}
+
+/**
+ * Manually trigger the processor. Drains any pending jobs in the background.
+ * Useful if the queue gets stuck for some reason — click the button, done.
+ */
+export async function triggerProcessor(): Promise<{ processed: boolean }> {
+  const result = await processNextJob()
+
+  if (result.remaining > 0) {
+    after(async () => {
+      let remaining = result.remaining
+      while (remaining > 0) {
+        const next = await processNextJob()
+        if (!next.processed) break
+        remaining = next.remaining
+      }
+    })
+  }
+
+  revalidatePath("/activity")
+  return { processed: result.processed }
 }
 
 export async function clearStaleJobs(): Promise<{ reaped: number }> {

@@ -1,7 +1,13 @@
 "use server"
 
+import { after } from "next/server"
 import { prisma } from "@/lib/db/prisma"
 import { reapStaleJobs } from "../services/queue-recovery"
+import { processNextJob } from "../services/process-queue"
+
+// Allow the processor (which runs AFTER this response via after()) to use
+// the full generation time budget on Vercel Pro.
+export const maxDuration = 300
 
 interface QueueResult {
   success: boolean
@@ -10,14 +16,26 @@ interface QueueResult {
 }
 
 /**
- * Queue a post generation job. Returns immediately — processing
- * happens in the background via /api/queue/process.
+ * Scheduled via Next.js after() — runs post-response, drains the queue
+ * one job at a time. No HTTP round-trip, no middleware, no CRON_SECRET.
+ * Just a direct function call after the user's response returns.
+ */
+async function drainQueue(): Promise<void> {
+  let remaining = 1
+  while (remaining > 0) {
+    const result = await processNextJob()
+    if (!result.processed) break
+    remaining = result.remaining
+  }
+}
+
+/**
+ * Queue a post generation job. Returns immediately; processing runs
+ * in the same function invocation after the response is sent.
  */
 export async function queuePostGeneration(siteId: string): Promise<QueueResult> {
-  // Self-heal before checking — prevents orphaned jobs from blocking forever
   await reapStaleJobs()
 
-  // Check site has approved keywords
   const keywordCount = await prisma.keyword.count({
     where: { siteId, status: "approved" },
   })
@@ -26,7 +44,6 @@ export async function queuePostGeneration(siteId: string): Promise<QueueResult> 
     return { success: false, error: "No approved keywords available. Run research first." }
   }
 
-  // Check for existing pending/processing job
   const existingJob = await prisma.jobQueue.findFirst({
     where: {
       siteId,
@@ -39,7 +56,6 @@ export async function queuePostGeneration(siteId: string): Promise<QueueResult> 
     return { success: false, error: "A post is already being generated for this site." }
   }
 
-  // Create the job
   const job = await prisma.jobQueue.create({
     data: {
       siteId,
@@ -48,27 +64,14 @@ export async function queuePostGeneration(siteId: string): Promise<QueueResult> 
     },
   })
 
-  // Kick off the queue processor
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000"
-  const cronSecret = process.env.CRON_SECRET
-
-  fetch(`${baseUrl}/api/queue/process`, {
-    method: "POST",
-    headers: {
-      ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
-    },
-  }).catch(() => {
-    // Fire and forget
-  })
+  // Runs after the response returns — extends the function to cover processing.
+  after(drainQueue)
 
   return { success: true, jobId: job.id }
 }
 
 /**
- * Queue a post publish job. Returns immediately — processing
- * happens in the background via /api/queue/process.
+ * Queue a post publish job. Same after() pattern as generation.
  */
 export async function queuePostPublish(postId: string): Promise<QueueResult> {
   await reapStaleJobs()
@@ -84,7 +87,6 @@ export async function queuePostPublish(postId: string): Promise<QueueResult> {
     return { success: false, error: "Publishing not configured for this site" }
   }
 
-  // Check for existing pending/processing publish job for this post
   const existingJob = await prisma.jobQueue.findFirst({
     where: {
       siteId: post.siteId,
@@ -107,20 +109,7 @@ export async function queuePostPublish(postId: string): Promise<QueueResult> {
     },
   })
 
-  // Kick off the queue processor
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000"
-  const cronSecret = process.env.CRON_SECRET
-
-  fetch(`${baseUrl}/api/queue/process`, {
-    method: "POST",
-    headers: {
-      ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
-    },
-  }).catch(() => {
-    // Fire and forget
-  })
+  after(drainQueue)
 
   return { success: true, jobId: job.id }
 }

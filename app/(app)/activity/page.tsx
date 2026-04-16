@@ -11,6 +11,7 @@ import {
   RetryButton,
   CancelButton,
   ClearStaleButton,
+  RunProcessorButton,
 } from "./job-actions"
 
 export const dynamic = "force-dynamic"
@@ -150,7 +151,10 @@ export default async function ActivityPage() {
             {inFlight.length > 0 && " Auto-refreshing every 5 seconds."}
           </p>
         </div>
-        <ClearStaleButton />
+        <div className="flex flex-col items-end gap-2">
+          <RunProcessorButton />
+          <ClearStaleButton />
+        </div>
       </div>
 
       <Card>
