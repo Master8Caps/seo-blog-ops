@@ -124,9 +124,11 @@ async function publishToStandardApi(
       }
     }
 
-    // Step 3: Convert markdown to HTML and publish
+    // Step 3: Convert markdown to HTML and publish. Strip the inline
+    // featured image since the target renders it from `featuredImage`.
     await updateJobProgress(jobId, "Publishing article...")
-    const htmlContent = markdownToHtml(post.content)
+    const bodyMarkdown = stripFeaturedFromContent(post.content, post.featuredImg)
+    const htmlContent = markdownToHtml(bodyMarkdown)
 
     const result = await apiPublishArticle(site.url, apiKey, {
       slug: post.slug,
@@ -229,9 +231,11 @@ async function publishToWordPress(
       }
     }
 
-    // Step 3: Convert markdown to HTML and publish
+    // Step 3: Convert markdown to HTML and publish. Strip the inline
+    // featured image since WordPress renders it from featured_media.
     await updateJobProgress(jobId, "Publishing post to WordPress...")
-    const htmlContent = markdownToHtml(post.content)
+    const bodyMarkdown = stripFeaturedFromContent(post.content, post.featuredImg)
+    const htmlContent = markdownToHtml(bodyMarkdown)
 
     const wpPost = await wpCreatePost(site.url, wpUsername, wpPassword, {
       title: post.title,
@@ -266,6 +270,26 @@ async function publishToWordPress(
 // ---------------------------------------------------------------------------
 // Shared utilities
 // ---------------------------------------------------------------------------
+
+/**
+ * Remove the leading ![...](url) markdown image from content when its URL
+ * matches the featured image. The target site already renders the featured
+ * image from the payload's `featuredImage` / `featured_media` field, so
+ * leaving it inline causes a double-render at the top of the post.
+ */
+function stripFeaturedFromContent(
+  content: string,
+  featuredUrl: string | null
+): string {
+  if (!featuredUrl) return content
+  // Escape regex metacharacters in the URL before interpolation.
+  const escaped = featuredUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const leadingImg = new RegExp(
+    String.raw`^\s*!\[[^\]]*\]\(${escaped}\)\s*\n*`,
+    ""
+  )
+  return content.replace(leadingImg, "")
+}
 
 function revalidatePaths(postId: string, siteSlug: string) {
   revalidatePath(`/content/${postId}`)
