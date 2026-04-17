@@ -75,9 +75,19 @@ export async function testConnection(
     }
 
     if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location") ?? "(no Location header)"
+      const isVercelSso =
+        location.includes("vercel.com/sso") ||
+        location.includes("_vercel_sso") ||
+        location.includes("deployment-protection")
+      const hint = isVercelSso
+        ? "This is Vercel Deployment Protection on the target site. Disable it (Target project → Settings → Deployment Protection → Standard Protection → Off) or add a bypass for /api/publish/*."
+        : location.startsWith("http")
+          ? `Target redirected to ${location}. Update the site URL in the dashboard to match the canonical domain (http vs https, www vs non-www, or trailing path).`
+          : `Redirect target: ${location}. Check site.url — it likely has a trailing /api/publish or wrong protocol.`
       return {
         success: false,
-        error: `Target redirected (${res.status}) instead of answering — check site.url (remove any /api/publish suffix).`,
+        error: `Target redirected (${res.status}) from ${endpoint} → ${location}. ${hint}`,
       }
     }
 
