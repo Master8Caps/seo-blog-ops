@@ -96,7 +96,8 @@ Requirements:
 - Write 1000-1500 words of high-quality, original content
 - Naturally incorporate the primary keyword "${input.primaryKeyword.keyword}" 3-5 times throughout the post
 - Use the primary keyword in the first paragraph, at least one H2, and the conclusion
-${secondaryList.length > 0 ? `- Naturally weave in each secondary keyword 1-2 times where it fits organically\n` : ""}- Structure with clear H2 and H3 headings, short paragraphs (2-3 sentences max)
+${secondaryList.length > 0 ? `- Naturally weave in each secondary keyword 1-2 times where it fits organically\n` : ""}- Capitalization: keywords are provided in lowercase for matching, but you MUST apply proper casing when using them. In the \`title\`, \`metaTitle\`, and any H1/H2/H3 headings, convert keywords to Title Case (e.g. "go to market" → "Go to Market"). In body copy, keep them lowercase unless they start a sentence or are proper nouns. The only place keywords should stay fully lowercase is the URL slug.
+- Structure with clear H2 and H3 headings, short paragraphs (2-3 sentences max)
 - Include practical advice, examples, or actionable tips
 - Write in markdown format
 - Include exactly 4 image placement markers in your content:
