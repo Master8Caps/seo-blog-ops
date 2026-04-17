@@ -168,12 +168,20 @@ export async function generatePost(
 
     // Step 5: Generate images via Gemini
     await updateJobProgress(jobId, "Generating images with Gemini...")
+    const promptCount = Array.isArray(blog.imagePrompts)
+      ? blog.imagePrompts.length
+      : 0
     console.info(
-      `[generate-post] post=${post.id} step=images prompts=${blog.imagePrompts?.length ?? 0}`
+      `[generate-post] post=${post.id} step=images prompts=${promptCount}`
     )
     let images: Awaited<ReturnType<typeof generateAndUploadImages>>["images"] = []
     let imageErrors: string[] = []
     try {
+      if (!Array.isArray(blog.imagePrompts)) {
+        throw new Error(
+          `imagePrompts missing from Claude response (got ${typeof blog.imagePrompts})`
+        )
+      }
       const result = await generateAndUploadImages(post.id, blog.imagePrompts)
       images = result.images
       imageErrors = result.errors
@@ -189,18 +197,26 @@ export async function generatePost(
       console.error(
         `[generate-post] post=${post.id} image errors: ${imageErrors.join(" | ")}`
       )
-      // Surface on the job so /activity can show what went wrong
-      if (jobId) {
-        await prisma.jobQueue.update({
-          where: { id: jobId },
-          data: {
-            payload: {
-              step: "Finalizing post...",
-              imageErrors: imageErrors.join(" | "),
+    }
+
+    // ALWAYS surface image stats on the job payload so /activity reflects
+    // reality even when step 5 silently produced zero images.
+    if (jobId) {
+      await prisma.jobQueue.update({
+        where: { id: jobId },
+        data: {
+          payload: {
+            step: "Finalizing post...",
+            imageStats: {
+              prompts: promptCount,
+              generated: images.length,
+              errors: imageErrors.length,
             },
+            imageErrors:
+              imageErrors.length > 0 ? imageErrors.join(" | ") : undefined,
           },
-        })
-      }
+        },
+      })
     }
 
     finalContent = replaceImageMarkers(finalContent, images)

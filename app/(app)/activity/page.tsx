@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  ImageIcon,
   Loader2,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -100,12 +101,30 @@ function JobRow({
           </p>
         )}
 
+        {job.imageStats && (
+          <p
+            className={`flex items-center gap-1 text-xs ${
+              job.imageStats.errors > 0 ||
+              job.imageStats.generated < job.imageStats.prompts
+                ? "text-yellow-500"
+                : "text-muted-foreground"
+            }`}
+          >
+            <ImageIcon className="h-3 w-3 shrink-0" />
+            <span>
+              Images: {job.imageStats.generated}/{job.imageStats.prompts}
+              {job.imageStats.errors > 0 &&
+                ` · ${job.imageStats.errors} error${
+                  job.imageStats.errors > 1 ? "s" : ""
+                }`}
+            </span>
+          </p>
+        )}
+
         {job.imageErrors && (
           <p className="flex items-start gap-1 text-xs text-yellow-500 line-clamp-3">
             <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
-            <span>
-              <span className="font-medium">Images:</span> {job.imageErrors}
-            </span>
+            <span>{job.imageErrors}</span>
           </p>
         )}
 

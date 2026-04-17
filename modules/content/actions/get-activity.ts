@@ -6,6 +6,12 @@ import { prisma } from "@/lib/db/prisma"
 import { reapStaleJobs } from "../services/queue-recovery"
 import { processNextJob } from "../services/process-queue"
 
+export interface ImageStats {
+  prompts: number
+  generated: number
+  errors: number
+}
+
 export interface ActivityJob {
   id: string
   type: string
@@ -16,6 +22,7 @@ export interface ActivityJob {
   step: string | null
   error: string | null
   imageErrors: string | null
+  imageStats: ImageStats | null
   postId: string | null
   publishedUrl: string | null
   createdAt: Date
@@ -36,6 +43,7 @@ function mapJob(job: {
     step?: string
     error?: string
     imageErrors?: string
+    imageStats?: ImageStats
     postId?: string
     publishedUrl?: string
   }
@@ -49,6 +57,7 @@ function mapJob(job: {
     step: payload.step ?? null,
     error: payload.error ?? null,
     imageErrors: payload.imageErrors ?? null,
+    imageStats: payload.imageStats ?? null,
     postId: payload.postId ?? null,
     publishedUrl: payload.publishedUrl ?? null,
     createdAt: job.createdAt,
