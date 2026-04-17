@@ -35,6 +35,21 @@ interface ConnectResult {
 /**
  * Test Standard API connection, fetch metadata, encrypt API key, and save.
  */
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Strip invisible Unicode chars that sneak in when pasting from notes
+ * apps (Apple Notes, OneNote, Notion, Keep) — NBSP, zero-width spaces,
+ * BOMs, directional marks. These survive .trim() and cause silent 401s.
+ */
+function normalizeApiKey(raw: string): string {
+  return raw
+    .replace(/[\u200B-\u200D\uFEFF\u00A0\u2028\u2029]/g, "")
+    .replace(/\s+/g, "")
+    .trim()
+}
+
 export async function testAndSyncApiConnection(
   siteId: string,
   apiKey: string
@@ -42,8 +57,14 @@ export async function testAndSyncApiConnection(
   const site = await prisma.site.findUnique({ where: { id: siteId } })
   if (!site) return { success: false, error: "Site not found" }
 
-  const trimmedKey = apiKey.trim()
+  const trimmedKey = normalizeApiKey(apiKey)
   if (!trimmedKey) return { success: false, error: "API key is empty" }
+  if (!UUID_REGEX.test(trimmedKey)) {
+    return {
+      success: false,
+      error: `That doesn't look like a valid UUID (got ${trimmedKey.length} chars after cleaning). Check for typos, extra text, or paste directly from plain text — not from a notes app.`,
+    }
+  }
 
   const connResult = await apiTestConnection(site.url, trimmedKey)
   if (!connResult.success) {
