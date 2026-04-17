@@ -28,6 +28,7 @@ import {
   queuePostPublish,
   getJobStatus,
 } from "@/modules/content/actions/queue-generation"
+import { unpublishPost } from "@/modules/publishing/actions/unpublish-post"
 import { renderMarkdown } from "@/lib/markdown"
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -52,6 +53,7 @@ export default function PostDetailPage() {
   const [publishing, setPublishing] = useState(false)
   const [publishStep, setPublishStep] = useState<string | null>(null)
   const [publishError, setPublishError] = useState<string | null>(null)
+  const [unpublishing, setUnpublishing] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -88,6 +90,27 @@ export default function PostDetailPage() {
     setPost(updated)
     setShowRejectInput(false)
     setRejectNotes("")
+  }
+
+  async function handleUnpublish() {
+    if (
+      !confirm(
+        "Unpublish this post? It'll be removed from the live site and set back to 'Approved' so you can edit and re-publish."
+      )
+    ) {
+      return
+    }
+    setUnpublishing(true)
+    setPublishError(null)
+    const result = await unpublishPost(postId)
+    if (!result.success) {
+      setPublishError(result.error ?? "Unpublish failed")
+      setUnpublishing(false)
+      return
+    }
+    const updated = await getPostById(postId)
+    setPost(updated)
+    setUnpublishing(false)
   }
 
   async function handlePublish() {
@@ -244,9 +267,29 @@ export default function PostDetailPage() {
       {/* Published details */}
       {post.status === "published" && post.publishedUrl && (
         <div className="rounded-lg border border-purple-500/30 bg-purple-500/5 p-4 space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-purple-400">
-            Published Details
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-purple-400">
+              Published Details
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleUnpublish}
+              disabled={unpublishing}
+            >
+              {unpublishing ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Unpublishing...
+                </>
+              ) : (
+                <>
+                  <X className="mr-1.5 h-3.5 w-3.5" />
+                  Unpublish
+                </>
+              )}
+            </Button>
+          </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">URL:</span>
             <a
