@@ -28,6 +28,7 @@ import {
   queuePostPublish,
   getJobStatus,
 } from "@/modules/content/actions/queue-generation"
+import { renderMarkdown } from "@/lib/markdown"
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "border-blue-500/50 bg-blue-500/10 text-blue-400" },
@@ -307,7 +308,7 @@ export default function PostDetailPage() {
           </p>
           <div
             className="h-[70vh] overflow-y-auto rounded-lg border border-border bg-card p-4 prose prose-invert prose-sm max-w-none"
-            dangerouslySetInnerHTML={{ __html: markdownToHtml(content) }}
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
           />
         </div>
       </div>
@@ -315,17 +316,3 @@ export default function PostDetailPage() {
   )
 }
 
-/** Simple markdown to HTML converter for preview */
-function markdownToHtml(md: string): string {
-  return md
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="rounded-lg my-4 max-w-full" />')
-    .replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold mt-6 mb-2">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-8 mb-3">$1</h2>')
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/^- (.+)$/gm, '<li class="ml-4">$1</li>')
-    .replace(/\n\n/g, '</p><p class="mb-3">')
-    .replace(/\n/g, "<br>")
-    .replace(/^/, '<p class="mb-3">')
-    .replace(/$/, "</p>")
-}

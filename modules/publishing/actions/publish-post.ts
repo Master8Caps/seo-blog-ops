@@ -13,6 +13,7 @@ import {
   uploadMedia as apiUploadMedia,
 } from "@/modules/publishing/services/standard-api"
 import { classifyPost } from "@/modules/publishing/services/classify-post"
+import { renderMarkdown } from "@/lib/markdown"
 
 interface PublishResult {
   success: boolean
@@ -128,7 +129,7 @@ async function publishToStandardApi(
     // featured image since the target renders it from `featuredImage`.
     await updateJobProgress(jobId, "Publishing article...")
     const bodyMarkdown = stripFeaturedFromContent(post.content, post.featuredImg)
-    const htmlContent = markdownToHtml(bodyMarkdown)
+    const htmlContent = renderMarkdown(bodyMarkdown)
 
     const result = await apiPublishArticle(site.url, apiKey, {
       slug: post.slug,
@@ -235,7 +236,7 @@ async function publishToWordPress(
     // featured image since WordPress renders it from featured_media.
     await updateJobProgress(jobId, "Publishing post to WordPress...")
     const bodyMarkdown = stripFeaturedFromContent(post.content, post.featuredImg)
-    const htmlContent = markdownToHtml(bodyMarkdown)
+    const htmlContent = renderMarkdown(bodyMarkdown)
 
     const wpPost = await wpCreatePost(site.url, wpUsername, wpPassword, {
       title: post.title,
@@ -297,22 +298,3 @@ function revalidatePaths(postId: string, siteSlug: string) {
   revalidatePath("/content")
 }
 
-function markdownToHtml(md: string): string {
-  return md
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />')
-    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
-    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/^- (.+)$/gm, "<li>$1</li>")
-    .replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`)
-    .replace(/\n\n/g, "</p>\n<p>")
-    .replace(/^/, "<p>")
-    .replace(/$/, "</p>")
-    .replace(/<p>(<h[1-3]>)/g, "$1")
-    .replace(/(<\/h[1-3]>)<\/p>/g, "$1")
-    .replace(/<p>(<ul>)/g, "$1")
-    .replace(/(<\/ul>)<\/p>/g, "$1")
-    .replace(/<p><\/p>/g, "")
-}
