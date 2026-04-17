@@ -117,8 +117,17 @@ async function publishToStandardApi(
         const imgRes = await fetch(post.featuredImg)
         if (imgRes.ok) {
           const imgBuffer = Buffer.from(await imgRes.arrayBuffer())
-          const filename = `${post.slug}-featured.png`
-          featuredImageUrl = await apiUploadMedia(site.url, apiKey, imgBuffer, filename)
+          const contentType =
+            imgRes.headers.get("content-type") ?? "image/png"
+          const ext = contentType.split("/")[1]?.split(";")[0] ?? "png"
+          const filename = `${post.slug}-featured.${ext}`
+          featuredImageUrl = await apiUploadMedia(
+            site.url,
+            apiKey,
+            imgBuffer,
+            filename,
+            contentType
+          )
         }
       } catch (error) {
         console.error("Featured image upload failed, using original URL:", error)

@@ -198,16 +198,46 @@ export async function unpublishArticle(
 }
 
 /**
+ * Infer image MIME type from filename extension. Falls back to image/png.
+ * Only used when the caller doesn't know the type from the original fetch.
+ */
+function contentTypeFromFilename(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase()
+  switch (ext) {
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg"
+    case "webp":
+      return "image/webp"
+    case "gif":
+      return "image/gif"
+    case "svg":
+      return "image/svg+xml"
+    case "png":
+    default:
+      return "image/png"
+  }
+}
+
+/**
  * Upload an image to the site's media storage.
+ * contentType is strongly recommended — without it the multipart Blob
+ * serializes as application/octet-stream and the target rejects with 400.
  */
 export async function uploadMedia(
   siteUrl: string,
   apiKey: string,
   imageBuffer: Buffer,
-  filename: string
+  filename: string,
+  contentType?: string
 ): Promise<string> {
+  const type = contentType ?? contentTypeFromFilename(filename)
   const formData = new FormData()
-  formData.append("image", new Blob([new Uint8Array(imageBuffer)]), filename)
+  formData.append(
+    "image",
+    new Blob([new Uint8Array(imageBuffer)], { type }),
+    filename
+  )
 
   const res = await fetch(apiUrl(siteUrl, "/media"), {
     method: "POST",
