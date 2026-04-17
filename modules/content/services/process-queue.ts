@@ -1,3 +1,4 @@
+import type { Prisma } from "@/app/generated/prisma/client"
 import { prisma } from "@/lib/db/prisma"
 import { generatePost } from "../actions/generate-post"
 import { publishPost } from "@/modules/publishing/actions/publish-post"
@@ -43,11 +44,23 @@ export async function processNextJob(): Promise<ProcessResult> {
       const result = await generatePost(job.siteId, job.id)
       if (!result.success) throw new Error(result.error ?? "Generation failed")
 
+      // Merge with the in-progress payload so imageStats/imageErrors survive.
+      const current = await prisma.jobQueue.findUnique({
+        where: { id: job.id },
+        select: { payload: true },
+      })
+      const existing =
+        current?.payload && typeof current.payload === "object"
+          ? (current.payload as Prisma.JsonObject)
+          : {}
       await prisma.jobQueue.update({
         where: { id: job.id },
         data: {
           status: "completed",
-          payload: { postId: result.postId },
+          payload: {
+            ...existing,
+            postId: result.postId,
+          } as Prisma.InputJsonValue,
         },
       })
       finalStatus = "completed"
@@ -58,27 +71,43 @@ export async function processNextJob(): Promise<ProcessResult> {
       const result = await publishPost(payload.postId, job.id)
       if (!result.success) throw new Error(result.error ?? "Publishing failed")
 
+      const current = await prisma.jobQueue.findUnique({
+        where: { id: job.id },
+        select: { payload: true },
+      })
+      const existing =
+        current?.payload && typeof current.payload === "object"
+          ? (current.payload as Prisma.JsonObject)
+          : {}
       await prisma.jobQueue.update({
         where: { id: job.id },
         data: {
           status: "completed",
           payload: {
+            ...existing,
             postId: payload.postId,
             publishedUrl: result.publishedUrl,
-          },
+          } as Prisma.InputJsonValue,
         },
       })
       finalStatus = "completed"
     }
   } catch (error) {
+    // Re-read rather than trusting the stale `job.payload` snapshot from the
+    // top of the function — progress/stats may have been written since.
+    const current = await prisma.jobQueue.findUnique({
+      where: { id: job.id },
+      select: { payload: true },
+    })
+    const existing = (current?.payload ?? {}) as Record<string, unknown>
     await prisma.jobQueue.update({
       where: { id: job.id },
       data: {
         status: "failed",
         payload: {
-          ...((job.payload as object) ?? {}),
+          ...existing,
           error: error instanceof Error ? error.message : "Unknown error",
-        },
+        } as Prisma.InputJsonValue,
       },
     })
   }

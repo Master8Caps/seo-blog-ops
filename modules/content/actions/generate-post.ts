@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import type { Prisma } from "@/app/generated/prisma/client"
 import { prisma } from "@/lib/db/prisma"
 import { anthropic } from "@/lib/ai/client"
 import {
@@ -24,16 +25,32 @@ interface GeneratePostResult {
 }
 
 /**
- * Update the job's payload with a progress step so the UI can display it.
+ * Merge partial updates into the job's JSON payload.
+ * Every caller here reads-then-writes because Prisma doesn't do JSONB merge
+ * natively and we want terminal state (imageStats, imageErrors) to survive
+ * subsequent progress updates and the final completion write in the queue processor.
  */
-async function updateJobProgress(jobId: string | undefined, step: string) {
+async function mergeJobPayload(
+  jobId: string | undefined,
+  updates: Record<string, Prisma.InputJsonValue | undefined>
+) {
   if (!jobId) return
+  const current = await prisma.jobQueue.findUnique({
+    where: { id: jobId },
+    select: { payload: true },
+  })
+  const existing =
+    current?.payload && typeof current.payload === "object"
+      ? (current.payload as Prisma.JsonObject)
+      : {}
   await prisma.jobQueue.update({
     where: { id: jobId },
-    data: {
-      payload: { step },
-    },
+    data: { payload: { ...existing, ...updates } as Prisma.InputJsonValue },
   })
+}
+
+async function updateJobProgress(jobId: string | undefined, step: string) {
+  await mergeJobPayload(jobId, { step })
 }
 
 /**
@@ -201,23 +218,16 @@ export async function generatePost(
 
     // ALWAYS surface image stats on the job payload so /activity reflects
     // reality even when step 5 silently produced zero images.
-    if (jobId) {
-      await prisma.jobQueue.update({
-        where: { id: jobId },
-        data: {
-          payload: {
-            step: "Finalizing post...",
-            imageStats: {
-              prompts: promptCount,
-              generated: images.length,
-              errors: imageErrors.length,
-            },
-            imageErrors:
-              imageErrors.length > 0 ? imageErrors.join(" | ") : undefined,
-          },
-        },
-      })
-    }
+    await mergeJobPayload(jobId, {
+      step: "Finalizing post...",
+      imageStats: {
+        prompts: promptCount,
+        generated: images.length,
+        errors: imageErrors.length,
+      },
+      imageErrors:
+        imageErrors.length > 0 ? imageErrors.join(" | ") : undefined,
+    })
 
     finalContent = replaceImageMarkers(finalContent, images)
     // Strip any markers that didn't get resolved so previews don't render broken images
