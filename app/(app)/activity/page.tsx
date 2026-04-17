@@ -1,5 +1,12 @@
 import Link from "next/link"
-import { Activity, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react"
+import {
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Loader2,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -90,6 +97,15 @@ function JobRow({
         {job.error && (
           <p className="text-xs text-destructive line-clamp-2">
             {job.error}
+          </p>
+        )}
+
+        {job.imageErrors && (
+          <p className="flex items-start gap-1 text-xs text-yellow-500 line-clamp-3">
+            <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+            <span>
+              <span className="font-medium">Images:</span> {job.imageErrors}
+            </span>
           </p>
         )}
 

@@ -168,6 +168,9 @@ export async function generatePost(
 
     // Step 5: Generate images via Gemini
     await updateJobProgress(jobId, "Generating images with Gemini...")
+    console.info(
+      `[generate-post] post=${post.id} step=images prompts=${blog.imagePrompts?.length ?? 0}`
+    )
     let images: Awaited<ReturnType<typeof generateAndUploadImages>>["images"] = []
     let imageErrors: string[] = []
     try {
@@ -178,8 +181,14 @@ export async function generatePost(
       imageErrors = [error instanceof Error ? error.message : "Unknown error"]
     }
 
+    console.info(
+      `[generate-post] post=${post.id} images generated=${images.length} errors=${imageErrors.length}`
+    )
+
     if (imageErrors.length > 0) {
-      console.error("Image generation errors:", imageErrors)
+      console.error(
+        `[generate-post] post=${post.id} image errors: ${imageErrors.join(" | ")}`
+      )
       // Surface on the job so /activity can show what went wrong
       if (jobId) {
         await prisma.jobQueue.update({

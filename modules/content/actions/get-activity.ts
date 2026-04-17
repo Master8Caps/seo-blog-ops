@@ -15,6 +15,7 @@ export interface ActivityJob {
   siteSlug: string
   step: string | null
   error: string | null
+  imageErrors: string | null
   postId: string | null
   publishedUrl: string | null
   createdAt: Date
@@ -34,6 +35,7 @@ function mapJob(job: {
   const payload = (job.payload ?? {}) as {
     step?: string
     error?: string
+    imageErrors?: string
     postId?: string
     publishedUrl?: string
   }
@@ -46,6 +48,7 @@ function mapJob(job: {
     siteSlug: job.site.slug,
     step: payload.step ?? null,
     error: payload.error ?? null,
+    imageErrors: payload.imageErrors ?? null,
     postId: payload.postId ?? null,
     publishedUrl: payload.publishedUrl ?? null,
     createdAt: job.createdAt,
