@@ -42,7 +42,10 @@ export async function testAndSyncApiConnection(
   const site = await prisma.site.findUnique({ where: { id: siteId } })
   if (!site) return { success: false, error: "Site not found" }
 
-  const connResult = await apiTestConnection(site.url, apiKey)
+  const trimmedKey = apiKey.trim()
+  if (!trimmedKey) return { success: false, error: "API key is empty" }
+
+  const connResult = await apiTestConnection(site.url, trimmedKey)
   if (!connResult.success) {
     return { success: false, error: connResult.error }
   }
@@ -51,7 +54,7 @@ export async function testAndSyncApiConnection(
   const existingConfig = (site.publishConfig as Record<string, unknown>) ?? {}
 
   const publishConfig = JSON.parse(JSON.stringify({
-    apiKey: encrypt(apiKey),
+    apiKey: encrypt(trimmedKey),
     publishAsDraft: existingConfig.publishAsDraft ?? false,
     autoPublishOnApproval: existingConfig.autoPublishOnApproval ?? false,
     taxonomy: {

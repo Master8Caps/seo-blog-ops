@@ -49,26 +49,56 @@ export async function testConnection(
   siteUrl: string,
   apiKey: string
 ): Promise<ApiConnectionResult> {
+  const trimmedKey = apiKey.trim()
+  const endpoint = apiUrl(siteUrl, "/metadata/categories")
+
   try {
-    const res = await fetch(apiUrl(siteUrl, "/metadata/categories"), {
-      headers: apiHeaders(apiKey),
+    const res = await fetch(endpoint, {
+      headers: apiHeaders(trimmedKey),
+      redirect: "manual",
     })
 
     if (res.status === 401 || res.status === 403) {
-      return { success: false, error: "Invalid API key." }
+      // Grab a snippet of the response body to distinguish our API's 401
+      // (JSON { error: "Unauthorized" }) from Vercel deployment protection
+      // (HTML login page) or other upstream auth layers.
+      const bodySnippet = (await res.text().catch(() => "")).slice(0, 200)
+      const hint = bodySnippet.toLowerCase().includes("vercel")
+        ? "Looks like Vercel Deployment Protection is enabled on the target site — disable it in Vercel → Settings → Deployment Protection."
+        : bodySnippet.toLowerCase().includes("<!doctype")
+          ? "Target returned an HTML auth page, not JSON — check if the site has a password-protection middleware in front of /api/publish/."
+          : "Verify BLOG_PUBLISH_API_KEY on the target site matches (and has been redeployed), and there's no leading/trailing whitespace."
+      return {
+        success: false,
+        error: `Invalid API key (${res.status}) from ${endpoint}. ${hint}${bodySnippet ? ` Response: ${bodySnippet}` : ""}`,
+      }
+    }
+
+    if (res.status >= 300 && res.status < 400) {
+      return {
+        success: false,
+        error: `Target redirected (${res.status}) instead of answering — check site.url (remove any /api/publish suffix).`,
+      }
     }
 
     if (!res.ok) {
-      return { success: false, error: `API returned ${res.status}. Is the publish API set up?` }
+      const bodySnippet = (await res.text().catch(() => "")).slice(0, 200)
+      return {
+        success: false,
+        error: `API returned ${res.status} from ${endpoint}. Is the publish API deployed? ${bodySnippet}`,
+      }
     }
 
     // Connection works — fetch all metadata
-    const metadata = await syncMetadata(siteUrl, apiKey)
+    const metadata = await syncMetadata(siteUrl, trimmedKey)
     return { success: true, metadata }
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error"
     if (msg.includes("fetch failed") || msg.includes("ENOTFOUND")) {
-      return { success: false, error: "Could not reach the site. Check the URL." }
+      return {
+        success: false,
+        error: `Could not reach ${endpoint}. Check the site URL.`,
+      }
     }
     return { success: false, error: `Connection failed: ${msg}` }
   }
