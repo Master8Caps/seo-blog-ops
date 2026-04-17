@@ -26,6 +26,7 @@ export default function EditSitePage() {
 
   const [siteId, setSiteId] = useState("")
   const [siteUrl, setSiteUrl] = useState("")
+  const [url, setUrl] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [reextracting, setReextracting] = useState(false)
@@ -48,6 +49,7 @@ export default function EditSitePage() {
       }
       setSiteId(site.id)
       setSiteUrl(site.url)
+      setUrl(site.url)
       setName(site.name)
       setDescription(site.description ?? "")
       setLogoUrl(site.logoUrl ?? "")
@@ -69,6 +71,7 @@ export default function EditSitePage() {
       await updateSite({
         id: siteId,
         name,
+        url: url !== siteUrl ? url : undefined,
         description: description || undefined,
         logoUrl: logoUrl.trim() ? logoUrl.trim() : null,
         niche: niche || undefined,
@@ -80,8 +83,8 @@ export default function EditSitePage() {
         onboardingStatus: "ready",
       })
       router.push(`/sites/${siteSlug}`)
-    } catch {
-      setError("Failed to save changes")
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save changes")
       setSaving(false)
     }
   }
@@ -133,6 +136,23 @@ export default function EditSitePage() {
                 onChange={(e) => setName(e.target.value)}
                 required
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="url">Site URL</Label>
+              <Input
+                id="url"
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://www.example.com"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Must match the site&apos;s canonical domain exactly (www vs
+                non-www, http vs https). Publishing API calls will fail with a
+                redirect error otherwise.
+              </p>
             </div>
 
             <div className="space-y-2">
