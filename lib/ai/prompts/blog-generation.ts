@@ -6,6 +6,14 @@ export interface KeywordForBlog {
   cluster: string | null
 }
 
+export interface InternalLinkCandidate {
+  title: string
+  url: string
+  excerpt: string | null
+  category: string | null
+  tags: string | null
+}
+
 export interface BlogGenerationInput {
   siteNiche: string
   siteAudience: string
@@ -13,6 +21,7 @@ export interface BlogGenerationInput {
   siteTopics: string[]
   primaryKeyword: KeywordForBlog
   secondaryKeywords: KeywordForBlog[]
+  existingPosts: InternalLinkCandidate[]
 }
 
 export interface BlogGenerationResult {
@@ -78,6 +87,18 @@ Respond with ONLY valid JSON (no markdown, no explanation):
 export function buildBlogGenerationPrompt(input: BlogGenerationInput): string {
   const secondaryList = input.secondaryKeywords.map((k) => k.keyword)
 
+  const existingPostsJson = JSON.stringify(
+    input.existingPosts.map((p) => ({
+      title: p.title,
+      url: p.url,
+      excerpt: p.excerpt ?? "",
+      category: p.category ?? "",
+      tags: p.tags ?? "",
+    })),
+    null,
+    2
+  )
+
   return `You are an expert SEO blog writer. Write a comprehensive blog post optimized for multiple target keywords.
 
 Site niche: ${input.siteNiche}
@@ -106,6 +127,39 @@ ${secondaryList.length > 0 ? `- Naturally weave in each secondary keyword 1-2 ti
   - \`![section](IMAGE_2)\` — in the middle of the post
   - \`![section](IMAGE_3)\` — near the end, before the conclusion
 - Generate a descriptive image prompt for each marker that matches the surrounding content
+
+## Internal links
+
+You will be given a list of articles already published on this site (EXISTING_POSTS).
+Your job: weave 2-4 contextual internal links into your blog body.
+
+Rules:
+- Find a natural phrase ALREADY in your draft body that semantically matches a target post.
+  Wrap that phrase as a Markdown link: [phrase](url).
+- DO NOT use the target post's exact title as the anchor unless it naturally fits the sentence.
+- DO NOT add new sentences just to host a link. The link must fit existing flow.
+- Spread links across the body — at most one in the intro, the rest distributed across H2 sections.
+- Aim for 2-4 links. If only 1 fits naturally, use 1. If 0 fit, use 0.
+- Never link to the post you're currently writing.
+- If EXISTING_POSTS is empty, skip internal linking entirely.
+
+EXISTING_POSTS:
+${existingPostsJson}
+
+## Blog structure
+
+1. Direct answer first. The opening paragraph (right after the H1, BEFORE any H2)
+   directly answers the search question implied by the keyword in 2-3 sentences.
+   No "in this article we'll cover..." filler.
+
+2. Sections via H2s. Each main idea = one H2. Use H3s only to subdivide an H2 when needed.
+   Never use H4 or deeper.
+
+3. Final section: Key takeaways. The last section is an H2 titled exactly
+   "Key takeaways" followed by 4-7 bullet points summarizing the post.
+   This is non-negotiable — every post ends this way.
+
+4. One H1 only (the post title — already handled by your title field).
 
 Respond with ONLY valid JSON matching this exact structure (no markdown wrapping, no explanation):
 {
