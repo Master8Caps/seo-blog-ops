@@ -1,4 +1,4 @@
-import { anthropic } from "@/lib/ai/client"
+import { createMessage } from "@/lib/usage/anthropic"
 import { parseAIJson } from "@/lib/ai/parse-json"
 import {
   buildRelevanceScoringPrompt,
@@ -7,7 +7,9 @@ import {
 } from "@/lib/ai/prompts/keyword-relevance"
 
 export async function scoreKeywordRelevance(
-  input: RelevanceScoringInput
+  input: RelevanceScoringInput,
+  siteId?: string,
+  researchRunId?: string
 ): Promise<RelevanceScoringResult> {
   // Process in batches of 50 to stay within token limits
   const batchSize = 50
@@ -20,10 +22,14 @@ export async function scoreKeywordRelevance(
       keywords: batch,
     })
 
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
-      messages: [{ role: "user", content: prompt }],
+    const message = await createMessage({
+      params: {
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4000,
+        messages: [{ role: "user", content: prompt }],
+      },
+      operation: "score-keywords",
+      attribution: { siteId, researchRunId },
     })
 
     const textBlock = message.content.find((block) => block.type === "text")

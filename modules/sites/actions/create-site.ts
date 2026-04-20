@@ -83,11 +83,14 @@ export async function crawlAndAnalyzeSite(
     }
 
     const [analysis, logoUrl] = await Promise.all([
-      analyzeSite({
-        url: site.url,
-        description: site.description ?? undefined,
-        pages: crawlResult.pages,
-      }),
+      analyzeSite(
+        {
+          url: site.url,
+          description: site.description ?? undefined,
+          pages: crawlResult.pages,
+        },
+        siteId
+      ),
       extractLogoUrl(site.url),
     ])
 

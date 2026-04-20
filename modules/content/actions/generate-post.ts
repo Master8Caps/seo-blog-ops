@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import type { Prisma } from "@/app/generated/prisma/client"
 import { prisma } from "@/lib/db/prisma"
-import { anthropic } from "@/lib/ai/client"
+import { createMessage } from "@/lib/usage/anthropic"
 import {
   buildKeywordGroupSelectionPrompt,
   buildBlogGenerationPrompt,
@@ -96,10 +96,14 @@ export async function generatePost(
         })),
       })
 
-      const selectionMsg = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        messages: [{ role: "user", content: selectionPrompt }],
+      const selectionMsg = await createMessage({
+        params: {
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: selectionPrompt }],
+        },
+        operation: "select-keywords",
+        attribution: { siteId, jobId },
       })
 
       const selectionText = selectionMsg.content.find((b) => b.type === "text")
@@ -140,10 +144,14 @@ export async function generatePost(
       secondaryKeywords: secondaryKws,
     })
 
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
-      messages: [{ role: "user", content: blogPrompt }],
+    const message = await createMessage({
+      params: {
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4000,
+        messages: [{ role: "user", content: blogPrompt }],
+      },
+      operation: "generate-content",
+      attribution: { siteId, jobId },
     })
 
     const textBlock = message.content.find((block) => block.type === "text")

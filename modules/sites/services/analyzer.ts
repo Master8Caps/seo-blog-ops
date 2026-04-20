@@ -1,4 +1,4 @@
-import { anthropic } from "@/lib/ai/client"
+import { createMessage } from "@/lib/usage/anthropic"
 import { parseAIJson } from "@/lib/ai/parse-json"
 import {
   buildSiteAnalysisPrompt,
@@ -7,14 +7,19 @@ import {
 } from "@/lib/ai/prompts/site-analysis"
 
 export async function analyzeSite(
-  input: SiteAnalysisInput
+  input: SiteAnalysisInput,
+  siteId?: string
 ): Promise<SiteAnalysisResult> {
   const prompt = buildSiteAnalysisPrompt(input)
 
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 2000,
-    messages: [{ role: "user", content: prompt }],
+  const message = await createMessage({
+    params: {
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2000,
+      messages: [{ role: "user", content: prompt }],
+    },
+    operation: "site-analysis",
+    attribution: { siteId },
   })
 
   const textBlock = message.content.find((block) => block.type === "text")

@@ -10,7 +10,7 @@ import {
 import { scoreKeywordRelevance } from "../services/relevance-scorer"
 import type { SiteProfile } from "@/modules/sites/types"
 import { parseAIJson } from "@/lib/ai/parse-json"
-import { anthropic } from "@/lib/ai/client"
+import { createMessage } from "@/lib/usage/anthropic"
 import {
   buildKeywordSelectionPrompt,
   type KeywordSelectionResult,
@@ -99,12 +99,16 @@ export async function scoreTopKeywords(siteId: string): Promise<StepResult> {
       return { success: true, keywordsFound: 0 }
     }
 
-    const scoring = await scoreKeywordRelevance({
-      siteNiche: site.niche ?? "unknown",
-      siteAudience: site.audience ?? "unknown",
-      siteTopics: (site.topics as string[]) ?? [],
-      keywords: unscored.map((k) => k.keyword),
-    })
+    const scoring = await scoreKeywordRelevance(
+      {
+        siteNiche: site.niche ?? "unknown",
+        siteAudience: site.audience ?? "unknown",
+        siteTopics: (site.topics as string[]) ?? [],
+        keywords: unscored.map((k) => k.keyword),
+      },
+      siteId,
+      undefined
+    )
 
     const scoreMap = new Map(
       scoring.scores.map((s) => [s.keyword.toLowerCase(), s])
@@ -179,10 +183,14 @@ export async function selectKeywords(siteId: string): Promise<StepResult> {
       })),
     })
 
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2000,
-      messages: [{ role: "user", content: prompt }],
+    const message = await createMessage({
+      params: {
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2000,
+        messages: [{ role: "user", content: prompt }],
+      },
+      operation: "select-keywords",
+      attribution: { siteId, researchRunId: undefined },
     })
 
     const textBlock = message.content.find((block) => block.type === "text")

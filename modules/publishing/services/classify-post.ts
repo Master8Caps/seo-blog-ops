@@ -1,7 +1,7 @@
 // modules/publishing/services/classify-post.ts
 "use server"
 
-import { anthropic } from "@/lib/ai/client"
+import { createMessage } from "@/lib/usage/anthropic"
 import { parseAIJson } from "@/lib/ai/parse-json"
 
 interface TaxonomyOption {
@@ -14,12 +14,19 @@ interface ClassificationResult {
   tags: string[]
 }
 
+interface ClassifyPostAttribution {
+  siteId?: string
+  postId?: string
+  jobId?: string
+}
+
 export async function classifyPost(
   postTitle: string,
   postContent: string,
   categories: TaxonomyOption[],
   tags: TaxonomyOption[],
-  siteContext?: string
+  siteContext?: string,
+  attribution?: ClassifyPostAttribution
 ): Promise<ClassificationResult> {
   const prompt = `You are classifying a blog post into a site's taxonomy.
 
@@ -44,10 +51,18 @@ Respond in JSON:
   "tags": ["<tag-slug>", ...]
 }`
 
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 500,
-    messages: [{ role: "user", content: prompt }],
+  const message = await createMessage({
+    params: {
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 500,
+      messages: [{ role: "user", content: prompt }],
+    },
+    operation: "classify-taxonomy",
+    attribution: {
+      siteId: attribution?.siteId,
+      postId: attribution?.postId,
+      jobId: attribution?.jobId,
+    },
   })
 
   const textBlock = message.content.find((b) => b.type === "text")

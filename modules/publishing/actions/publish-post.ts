@@ -97,7 +97,8 @@ async function publishToStandardApi(
         post.content,
         taxonomy.categories,
         tagOptions,
-        contextStr
+        contextStr,
+        { siteId: site.id, postId: post.id, jobId }
       )
       category = classification.category
       tags = classification.tags.join(",")
@@ -204,7 +205,14 @@ async function publishToWordPress(
 
       const catOptions = taxonomy.categories.map((c) => ({ slug: c.slug, name: c.name }))
       const tagOptions = taxonomy.tags.map((t) => ({ slug: t.slug, name: t.name }))
-      const classification = await classifyPost(post.title, post.content, catOptions, tagOptions)
+      const classification = await classifyPost(
+        post.title,
+        post.content,
+        catOptions,
+        tagOptions,
+        undefined,
+        { siteId: site.id, postId: post.id, jobId }
+      )
       categorySlug = classification.category
       tagSlugs = classification.tags
 
