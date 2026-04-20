@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/db/prisma"
 import {
-  getKeywordsForKeywords,
-  getKeywordsForSite,
+  keywordsForKeywords,
+  keywordsForSite,
   type KeywordData,
-} from "@/lib/seo/client"
+} from "@/lib/usage/dataforseo"
 import { scoreKeywordRelevance } from "../services/relevance-scorer"
 import type { SiteProfile } from "@/modules/sites/types"
 import { parseAIJson } from "@/lib/ai/parse-json"
@@ -44,7 +44,10 @@ export async function discoverFromSeeds(siteId: string): Promise<StepResult> {
   }
 
   try {
-    const results = await getKeywordsForKeywords(seedKeywords)
+    const results = await keywordsForKeywords(seedKeywords, {
+      siteId,
+      researchRunId: undefined,
+    })
     const saved = await saveKeywords(siteId, results)
     revalidatePath(`/sites/${site.slug}/research`)
     return { success: true, keywordsFound: saved }
@@ -66,7 +69,10 @@ export async function discoverFromSite(siteId: string): Promise<StepResult> {
   if (!site) return { success: false, keywordsFound: 0, error: "Site not found" }
 
   try {
-    const results = await getKeywordsForSite(site.url)
+    const results = await keywordsForSite(site.url, {
+      siteId,
+      researchRunId: undefined,
+    })
     const saved = await saveKeywords(siteId, results)
     revalidatePath(`/sites/${site.slug}/research`)
     return { success: true, keywordsFound: saved }

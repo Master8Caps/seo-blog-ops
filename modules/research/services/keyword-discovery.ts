@@ -1,10 +1,11 @@
 import {
-  getKeywordsForKeywords,
-  getKeywordsForSite,
+  keywordsForKeywords,
+  keywordsForSite,
   type KeywordData,
-} from "@/lib/seo/client"
+} from "@/lib/usage/dataforseo"
 
 export interface DiscoveryInput {
+  siteId: string
   siteUrl: string
   seedKeywords: string[]
   locationCode: number
@@ -20,11 +21,13 @@ export async function discoverKeywords(
 ): Promise<DiscoveryResult> {
   const errors: string[] = []
   const keywordMap = new Map<string, KeywordData>()
+  const attribution = { siteId: input.siteId, researchRunId: undefined }
 
   if (input.seedKeywords.length > 0) {
     try {
-      const results = await getKeywordsForKeywords(
+      const results = await keywordsForKeywords(
         input.seedKeywords,
+        attribution,
         input.locationCode
       )
       for (const kw of results) {
@@ -38,7 +41,11 @@ export async function discoverKeywords(
   }
 
   try {
-    const results = await getKeywordsForSite(input.siteUrl, input.locationCode)
+    const results = await keywordsForSite(
+      input.siteUrl,
+      attribution,
+      input.locationCode
+    )
     for (const kw of results) {
       if (!keywordMap.has(kw.keyword.toLowerCase())) {
         keywordMap.set(kw.keyword.toLowerCase(), kw)
