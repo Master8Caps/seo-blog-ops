@@ -166,12 +166,13 @@ export async function generatePost(
 
     // Step 3: Create post record (linked to primary keyword)
     await updateJobProgress(jobId, "Saving draft post...")
+    const uniqueSlug = await resolveUniqueSlug(siteId, blog.slug)
     const post = await prisma.post.create({
       data: {
         siteId,
         keywordId: primaryKw.id,
         title: blog.title,
-        slug: blog.slug,
+        slug: uniqueSlug,
         content: blog.content,
         excerpt: blog.excerpt,
         metaTitle: blog.metaTitle,
@@ -286,6 +287,29 @@ export async function generatePost(
     return {
       success: false,
       error: `Generation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+    }
+  }
+}
+
+/**
+ * If the requested slug already exists for this site, append a numeric suffix
+ * until we find one that doesn't: slug → slug-2 → slug-3, etc.
+ */
+async function resolveUniqueSlug(siteId: string, requestedSlug: string): Promise<string> {
+  let candidate = requestedSlug
+  let n = 1
+  while (true) {
+    const existing = await prisma.post.findUnique({
+      where: { siteId_slug: { siteId, slug: candidate } },
+      select: { id: true },
+    })
+    if (!existing) return candidate
+    n++
+    candidate = `${requestedSlug}-${n}`
+    if (n > 50) {
+      throw new Error(
+        `Could not find a unique slug after 50 attempts. Base: ${requestedSlug}`
+      )
     }
   }
 }
