@@ -14,6 +14,7 @@ import {
   syncMetadata as apiSyncMetadata,
   type ApiMetadata,
 } from "@/modules/publishing/services/standard-api"
+import { syncExternalPosts } from "@/modules/publishing/services/sync-external-posts"
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -26,6 +27,8 @@ interface ConnectResult {
   tagCount?: number
   contextGroupCount?: number
   userName?: string
+  postsCount?: number
+  postsWarning?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +97,27 @@ export async function testAndSyncApiConnection(
     },
   })
 
+  // Also sync existing posts on the site for internal-link generation.
+  // Failures here don't fail the connection — metadata sync already succeeded.
+  let postsCount = 0
+  let postsWarning: string | null = null
+
+  try {
+    const postsResult = await syncExternalPosts({
+      id: site.id,
+      publishType: "api",
+      publishConfig: {
+        siteUrl: site.url,
+        apiKey: trimmedKey, // plaintext already in scope
+      },
+    })
+
+    postsCount = postsResult.count
+    if (!postsResult.ok) postsWarning = postsResult.error ?? "Unknown error"
+  } catch (err) {
+    postsWarning = err instanceof Error ? err.message : String(err)
+  }
+
   revalidatePath(`/sites/${site.slug}`)
   revalidatePath(`/sites/${site.slug}/publishing`)
 
@@ -102,6 +126,8 @@ export async function testAndSyncApiConnection(
     categoryCount: metadata.categories.length,
     tagCount: metadata.tags.length,
     contextGroupCount: metadata.context.length,
+    postsCount,
+    postsWarning,
   }
 }
 
@@ -198,6 +224,28 @@ export async function testAndSyncConnection(
     },
   })
 
+  // Also sync existing posts on the site for internal-link generation.
+  // Failures here don't fail the connection — metadata sync already succeeded.
+  let postsCount = 0
+  let postsWarning: string | null = null
+
+  try {
+    const postsResult = await syncExternalPosts({
+      id: site.id,
+      publishType: "wordpress",
+      publishConfig: {
+        siteUrl: site.url,
+        username, // plaintext already in scope
+        appPassword: password, // plaintext already in scope
+      },
+    })
+
+    postsCount = postsResult.count
+    if (!postsResult.ok) postsWarning = postsResult.error ?? "Unknown error"
+  } catch (err) {
+    postsWarning = err instanceof Error ? err.message : String(err)
+  }
+
   revalidatePath(`/sites/${site.slug}`)
   revalidatePath(`/sites/${site.slug}/publishing`)
 
@@ -206,6 +254,8 @@ export async function testAndSyncConnection(
     categoryCount: taxonomy.categories.length,
     tagCount: taxonomy.tags.length,
     userName: connResult.user?.name,
+    postsCount,
+    postsWarning,
   }
 }
 
