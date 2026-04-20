@@ -17,6 +17,7 @@ import {
   generateAndUploadImages,
   replaceImageMarkers,
 } from "../services/image-generator"
+import { getInternalLinkCandidates } from "../services/get-internal-link-candidates"
 
 interface GeneratePostResult {
   success: boolean
@@ -135,6 +136,7 @@ export async function generatePost(
 
     // Step 2: Generate blog content with Claude
     await updateJobProgress(jobId, "Writing blog content with AI...")
+    const existingPosts = await getInternalLinkCandidates(siteId)
     const blogPrompt = buildBlogGenerationPrompt({
       siteNiche: site.niche ?? "unknown",
       siteAudience: site.audience ?? "unknown",
@@ -142,6 +144,7 @@ export async function generatePost(
       siteTopics: (site.topics as string[]) ?? [],
       primaryKeyword: primaryKw,
       secondaryKeywords: secondaryKws,
+      existingPosts,
     })
 
     const message = await createMessage({
