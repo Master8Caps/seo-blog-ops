@@ -196,6 +196,9 @@ export async function generatePost(
       finalContent = await humanizeContent(blog.content, {
         keyword: primaryKw.keyword,
         additionalKeywords: secondaryKws.map((k) => k.keyword),
+        siteId,
+        postId: post.id,
+        jobId,
       })
     } catch (error) {
       console.error("StealthGPT humanization failed, using original:", error)

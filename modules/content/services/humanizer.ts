@@ -1,12 +1,11 @@
-const STEALTHGPT_API = "https://stealthgpt.ai/api/stealthify"
+import { humanize } from "@/lib/usage/stealthgpt"
 
 interface HumanizerOptions {
   keyword: string
   additionalKeywords?: string[]
-}
-
-interface StealthGPTResponse {
-  result: string
+  siteId?: string
+  postId?: string
+  jobId?: string
 }
 
 /**
@@ -17,16 +16,15 @@ interface StealthGPTResponse {
  * 2. For each section: swap keywords with placeholders, strip markdown,
  *    humanize via StealthGPT, restore keywords and markdown structure
  * 3. Reassemble into full post
+ *
+ * StealthGPT calls go through `lib/usage/stealthgpt.humanize` so each per-section
+ * call emits a `usage_events` row attributed to (siteId, postId, jobId).
+ * One post with N sections produces N rows — that's by design for per-call attribution.
  */
 export async function humanizeContent(
   markdownContent: string,
   options: HumanizerOptions
 ): Promise<string> {
-  const apiToken = process.env.STEALTHGPT_API_TOKEN
-  if (!apiToken) {
-    throw new Error("STEALTHGPT_API_TOKEN is not configured")
-  }
-
   const keywords = [options.keyword, ...(options.additionalKeywords ?? [])]
   const sections = splitIntoSections(markdownContent)
 
@@ -58,27 +56,17 @@ export async function humanizeContent(
       continue
     }
 
-    // Call StealthGPT
-    const response = await fetch(STEALTHGPT_API, {
-      method: "POST",
-      headers: {
-        "api-token": apiToken,
-        "Content-Type": "application/json",
+    // Call StealthGPT via the usage wrapper (logs a usage_events row per call)
+    const result = await humanize({
+      text: bodyText,
+      operation: "humanize",
+      attribution: {
+        siteId: options.siteId,
+        postId: options.postId,
+        jobId: options.jobId,
       },
-      body: JSON.stringify({
-        prompt: bodyText,
-        rephrase: true,
-        tone: "College",
-        qualityMode: "quality",
-      }),
     })
-
-    if (!response.ok) {
-      throw new Error(`StealthGPT API error: ${response.status}`)
-    }
-
-    const data = (await response.json()) as StealthGPTResponse
-    let humanized = data.result
+    let humanized = result.humanized
 
     // Restore keywords from placeholders
     for (const [placeholder, kw] of placeholders) {
