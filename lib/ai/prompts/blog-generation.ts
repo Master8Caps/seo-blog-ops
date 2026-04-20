@@ -113,12 +113,26 @@ Monthly search volume: ${input.primaryKeyword.searchVolume ?? "unknown"}
 
 Secondary keywords to incorporate: ${secondaryList.length > 0 ? secondaryList.map((k) => `"${k}"`).join(", ") : "none"}
 
+## CRITICAL RULE — keyword casing
+
+Keywords are provided above in **lowercase** for matching purposes. DO NOT preserve that lowercase when you use them.
+
+- **title**: Title Case every word of the keyword. "best unicorn party ideas" → "Best Unicorn Party Ideas". NEVER lowercase. This is the #1 rule — breaking it means the post is broken.
+- **metaTitle**: Title Case every word of the keyword. Same as title.
+- **H1, H2, H3 headings**: Title Case every word of the keyword.
+- **Body copy**: sentence casing — keywords lowercase unless they start a sentence or are proper nouns.
+- **URL slug**: lowercase (this is the ONLY field where the keyword stays lowercase).
+
+Example — primary keyword "go to market strategy":
+- ✅ title: "Your First Go to Market Strategy: A Founder's Playbook"
+- ❌ title: "Your First go to market Strategy: A Founder's Playbook"
+- ✅ slug: "your-first-go-to-market-strategy-founders-playbook"
+
 Requirements:
 - Write 1000-1500 words of high-quality, original content
 - Naturally incorporate the primary keyword "${input.primaryKeyword.keyword}" 3-5 times throughout the post
 - Use the primary keyword in the first paragraph, at least one H2, and the conclusion
-${secondaryList.length > 0 ? `- Naturally weave in each secondary keyword 1-2 times where it fits organically\n` : ""}- Capitalization: keywords are provided in lowercase for matching, but you MUST apply proper casing when using them. In the \`title\`, \`metaTitle\`, and any H1/H2/H3 headings, convert keywords to Title Case (e.g. "go to market" → "Go to Market"). In body copy, keep them lowercase unless they start a sentence or are proper nouns. The only place keywords should stay fully lowercase is the URL slug.
-- Structure with clear H2 and H3 headings, short paragraphs (2-3 sentences max)
+${secondaryList.length > 0 ? `- Naturally weave in each secondary keyword 1-2 times where it fits organically\n` : ""}- Structure with clear H2 and H3 headings, short paragraphs (2-3 sentences max)
 - Include practical advice, examples, or actionable tips
 - Write in markdown format
 - Include exactly 4 image placement markers in your content:
@@ -163,9 +177,9 @@ ${existingPostsJson}
 
 Respond with ONLY valid JSON matching this exact structure (no markdown wrapping, no explanation):
 {
-  "title": "Engaging blog post title that includes the primary keyword naturally",
-  "slug": "url-friendly-slug-derived-from-title",
-  "metaTitle": "SEO meta title, 50-60 characters, includes primary keyword",
+  "title": "Engaging blog post title — primary keyword in TITLE CASE (never lowercase, never sentence case)",
+  "slug": "url-friendly-slug-derived-from-title (lowercase only)",
+  "metaTitle": "SEO meta title, 50-60 characters — primary keyword in TITLE CASE",
   "metaDesc": "SEO meta description, 150-160 characters, compelling with primary keyword",
   "excerpt": "2-3 sentence summary of the post for previews",
   "content": "Full markdown content with image markers as specified above",
