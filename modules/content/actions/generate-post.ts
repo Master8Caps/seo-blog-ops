@@ -179,6 +179,16 @@ export async function generatePost(
       },
     })
 
+    // Backfill postId on usage_events that were logged before the Post row existed.
+    // These rows currently have jobId set but postId null. After creating the post,
+    // we can link them so getPostCost(postId) returns the full cost.
+    if (jobId) {
+      await prisma.usageEvent.updateMany({
+        where: { jobId, postId: null },
+        data: { postId: post.id },
+      })
+    }
+
     // Step 4: Humanize content via StealthGPT
     await updateJobProgress(jobId, "Humanizing content via StealthGPT...")
     let finalContent = blog.content
