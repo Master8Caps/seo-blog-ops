@@ -7,6 +7,7 @@ import {
   Globe,
   FileText,
   Activity,
+  Wallet,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -37,6 +38,7 @@ const mainNavItems = [
   { href: "/sites", label: "Sites", icon: Globe, badgeKey: null as null | "activity" },
   { href: "/content", label: "Content", icon: FileText, badgeKey: null as null | "activity" },
   { href: "/activity", label: "Activity", icon: Activity, badgeKey: "activity" as const },
+  { href: "/costs", label: "Costs", icon: Wallet, badgeKey: null as null | "activity" },
 ]
 
 interface SidebarProps {
