@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
 import { generateImage } from "@/lib/usage/gemini"
+import { optimizeImage } from "@/lib/images/optimize"
 
 export interface ImagePrompt {
   section: string
@@ -78,13 +79,34 @@ export async function generateAndUploadImages(
         },
       })
 
-      const ext = mimeType === "image/webp" ? "webp" : "png"
-      const filePath = `posts/${postId}/${section}.${ext}`
+      let uploadBytes = imageBytes
+      let uploadMimeType = mimeType
+      let uploadExt = mimeType === "image/webp" ? "webp" : "png"
+      let compressionRatio: string | null = null
+
+      try {
+        const optimized = await optimizeImage(imageBytes, {
+          maxWidth: 1200,
+          maxHeight: 1200,
+          format: "webp",
+          quality: 80,
+        })
+        uploadBytes = optimized.buffer
+        uploadMimeType = optimized.mimeType
+        uploadExt = "webp"
+        compressionRatio = `${(optimized.originalBytes / 1024).toFixed(0)}KB → ${(optimized.finalBytes / 1024).toFixed(0)}KB (${Math.round((1 - optimized.finalBytes / optimized.originalBytes) * 100)}%)`
+        console.log(`[image-generator] optimized ${section}: ${compressionRatio}`)
+      } catch (err) {
+        console.error(`[image-generator] optimize failed for ${section}, uploading raw:`, err)
+        // Fall back: keep original imageBytes/mimeType/png extension. Image still gets uploaded.
+      }
+
+      const filePath = `posts/${postId}/${section}.${uploadExt}`
 
       const { error: uploadError } = await supabase.storage
         .from("post-images")
-        .upload(filePath, imageBytes, {
-          contentType: mimeType,
+        .upload(filePath, uploadBytes, {
+          contentType: uploadMimeType,
           upsert: true,
         })
 
