@@ -19,7 +19,8 @@ export const PRICING = {
   gemini: {
     "gemini-3.1-flash-image-preview": { perImage: 0.039 },
   } as Record<string, GeminiModelPricing>,
-  stealthgpt: { perWord: 0.0000285 },
+  // StealthGPT: $0.20 per 1000 words — confirmed from their dashboard 2026-04-20
+  stealthgpt: { perWord: 0.0002 },
   jina: { perCall: 0.0 },
 } as const
 

@@ -27,7 +27,8 @@ describe("computeCostUsd", () => {
       model: null,
       units: { wordCount: 1000 },
     })
-    expect(cost).toBeCloseTo(0.0285, 4)
+    // $0.20 per 1000 words = $0.0002/word × 1000 = $0.20
+    expect(cost).toBeCloseTo(0.2, 4)
   })
 
   it("returns 0 for free-tier Jina", () => {

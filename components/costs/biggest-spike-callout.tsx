@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { AlertTriangle } from "lucide-react"
+import { formatGbp } from "@/lib/format"
 
 interface BiggestSpikeCalloutProps {
   spike: {
@@ -19,7 +20,7 @@ export function BiggestSpikeCallout({ spike }: BiggestSpikeCalloutProps) {
       <Link href={spike.itemLink} className="text-blue-400 hover:underline">
         {spike.itemTitle}
       </Link>
-      <span className="ml-auto font-medium">£{spike.costGbp.toFixed(3)}</span>
+      <span className="ml-auto font-medium">{formatGbp(spike.costGbp)}</span>
       <span className="text-xs text-muted-foreground">
         {spike.date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
       </span>

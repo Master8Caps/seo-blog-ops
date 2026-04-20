@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/card"
+import { formatGbp } from "@/lib/format"
 
 interface ProviderShare {
   provider: string
@@ -59,7 +60,7 @@ export function ProviderDonut({ providers }: ProviderDonutProps) {
                   <span className="size-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                   {p.provider}
                 </span>
-                <span>£{p.costGbp.toFixed(2)} ({p.pct.toFixed(0)}%)</span>
+                <span>{formatGbp(p.costGbp)} ({p.pct.toFixed(0)}%)</span>
               </li>
             ))}
           </ul>

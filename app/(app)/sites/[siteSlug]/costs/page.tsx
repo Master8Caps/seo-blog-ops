@@ -5,6 +5,7 @@ import { CostKpiCard } from "@/components/costs/cost-kpi-card"
 import { CostTrendChart } from "@/components/costs/cost-trend-chart"
 import { CostItemizedTable } from "@/components/costs/cost-itemized-table"
 import { BiggestSpikeCallout } from "@/components/costs/biggest-spike-callout"
+import { formatGbp, formatUsd, formatGbpDelta } from "@/lib/format"
 
 interface PageProps {
   params: Promise<{ siteSlug: string }>
@@ -19,8 +20,6 @@ export default async function SiteCostsPage({ params }: PageProps) {
   if (!site) notFound()
 
   const summary = await getSiteCosts({ siteId: site.id })
-  const fmtGbp = (n: number) => `£${n.toFixed(2)}`
-  const fmtDelta = (n: number) => `${n >= 0 ? "+" : ""}£${n.toFixed(2)} vs last`
 
   return (
     <div className="flex flex-col gap-5 p-6">
@@ -29,20 +28,20 @@ export default async function SiteCostsPage({ params }: PageProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <CostKpiCard
           label="Total spent"
-          value={fmtGbp(summary.totalGbp)}
-          sub={`$${summary.totalUsd.toFixed(2)} USD`}
+          value={formatGbp(summary.totalGbp)}
+          sub={`${formatUsd(summary.totalUsd)} USD`}
         />
         <CostKpiCard
           label="This month"
-          value={fmtGbp(summary.thisMonthGbp)}
-          sub={fmtDelta(summary.monthDeltaGbp)}
+          value={formatGbp(summary.thisMonthGbp)}
+          sub={formatGbpDelta(summary.monthDeltaGbp)}
           subClassName={summary.monthDeltaGbp >= 0 ? "text-amber-500" : "text-green-500"}
         />
         <CostKpiCard
           label="Avg per published post"
           value={
             summary.avgPerPublishedPostGbp !== null
-              ? fmtGbp(summary.avgPerPublishedPostGbp)
+              ? formatGbp(summary.avgPerPublishedPostGbp)
               : "—"
           }
           sub={`across ${summary.publishedPostCount} posts`}

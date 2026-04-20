@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
+import { formatGbp } from "@/lib/format"
 
 type ItemKind = "blog" | "research" | "onboarding" | "other"
 
@@ -78,7 +79,7 @@ export function CostItemizedTable({ items }: CostItemizedTableProps) {
             </span>
             <span className="truncate">{it.title}</span>
             <span className="text-muted-foreground">{it.operationsSummary}</span>
-            <span className="text-right">£{it.costGbp.toFixed(3)}</span>
+            <span className="text-right">{formatGbp(it.costGbp)}</span>
           </Link>
         ))}
       </div>

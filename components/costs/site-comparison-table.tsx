@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
+import { formatGbp } from "@/lib/format"
 
 interface SiteRow {
   siteId: string
@@ -39,12 +40,12 @@ export function SiteComparisonTable({ sites }: SiteComparisonTableProps) {
             className="grid grid-cols-[1fr_100px_100px_80px_100px_100px] gap-2 px-2 py-2.5 border-b border-border/50 hover:bg-muted/30"
           >
             <span>{s.siteName}</span>
-            <span className="text-right">£{s.totalGbp.toFixed(2)}</span>
-            <span className="text-right">£{s.thisMonthGbp.toFixed(2)}</span>
+            <span className="text-right">{formatGbp(s.totalGbp)}</span>
+            <span className="text-right">{formatGbp(s.thisMonthGbp)}</span>
             <span className="text-right">{s.publishedPostCount}</span>
             <span className="text-right">
               {s.avgPerPublishedPostGbp !== null
-                ? `£${s.avgPerPublishedPostGbp.toFixed(3)}`
+                ? formatGbp(s.avgPerPublishedPostGbp)
                 : "—"}
             </span>
             <span className="text-right text-muted-foreground">

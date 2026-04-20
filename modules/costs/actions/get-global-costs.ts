@@ -194,15 +194,44 @@ export async function getGlobalCosts(
   const avgPerPublishedPostGbp =
     totalPostsPublished > 0 ? totalPublishedGbp / totalPostsPublished : null
 
-  // Biggest spike (last 30 days, across scope)
+  // Biggest spike — largest cost unit (post / research run / onboarding) in last 30 days,
+  // NOT the largest single API call.
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const recent = events.filter((e) => e.createdAt >= thirtyDaysAgo)
   let biggestSpike: GlobalCostSummary["biggestSpike"] = null
   if (recent.length > 0) {
-    const max = recent.reduce((a, b) =>
-      Number(a.costGbp) > Number(b.costGbp) ? a : b
-    )
-    biggestSpike = await resolveSpikeLink(max, siteMap)
+    const unitGroups = new Map<
+      string,
+      { cost: number; latestEvent: (typeof recent)[number] }
+    >()
+    for (const e of recent) {
+      const key = e.postId
+        ? `post:${e.postId}`
+        : e.researchRunId
+        ? `run:${e.researchRunId}`
+        : `onboard:${e.siteId ?? "unattributed"}`
+      const existing = unitGroups.get(key)
+      if (existing) {
+        existing.cost += Number(e.costGbp)
+        if (e.createdAt > existing.latestEvent.createdAt) existing.latestEvent = e
+      } else {
+        unitGroups.set(key, { cost: Number(e.costGbp), latestEvent: e })
+      }
+    }
+    if (unitGroups.size >= 2) {
+      const units = [...unitGroups.values()]
+      const top = units.reduce((a, b) => (a.cost > b.cost ? a : b))
+      const others = units.filter((u) => u !== top)
+      const avgOfOthers =
+        others.reduce((sum, u) => sum + u.cost, 0) / Math.max(others.length, 1)
+      // Only surface as a spike if top is materially above the rest.
+      if (top.cost >= avgOfOthers * 1.5 && top.cost - avgOfOthers >= 0.05) {
+        biggestSpike = await resolveSpikeLink(
+          { ...top.latestEvent, costGbp: top.cost },
+          siteMap
+        )
+      }
+    }
   }
 
   return {

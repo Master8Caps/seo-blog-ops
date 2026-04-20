@@ -105,13 +105,46 @@ export async function getSiteCosts(input: GetSiteCostsInput): Promise<SiteCostSu
   const trend = bucketize(allEvents, bucket)
   const items = await buildItemizedRows(siteId, slug)
 
-  // Biggest spike — last 30 days
+  // Biggest spike — largest cost unit (post / research run / onboarding) in last 30 days.
+  // NOT the largest single API call — that's a misleading "spike" because it's always
+  // just one slice of one blog.
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const recent = allEvents.filter((e) => e.createdAt >= thirtyDaysAgo)
   let biggestSpike: SpikeCallout | null = null
   if (recent.length > 0) {
-    const max = recent.reduce((a, b) => (Number(a.costGbp) > Number(b.costGbp) ? a : b))
-    biggestSpike = await buildSpikeCallout(max, slug)
+    const unitGroups = new Map<
+      string,
+      { cost: number; latestEvent: (typeof recent)[number] }
+    >()
+    for (const e of recent) {
+      const key = e.postId
+        ? `post:${e.postId}`
+        : e.researchRunId
+        ? `run:${e.researchRunId}`
+        : `onboard:${siteId}`
+      const existing = unitGroups.get(key)
+      if (existing) {
+        existing.cost += Number(e.costGbp)
+        if (e.createdAt > existing.latestEvent.createdAt) existing.latestEvent = e
+      } else {
+        unitGroups.set(key, { cost: Number(e.costGbp), latestEvent: e })
+      }
+    }
+    if (unitGroups.size >= 2) {
+      const units = [...unitGroups.values()]
+      const top = units.reduce((a, b) => (a.cost > b.cost ? a : b))
+      const others = units.filter((u) => u !== top)
+      const avgOfOthers =
+        others.reduce((sum, u) => sum + u.cost, 0) / Math.max(others.length, 1)
+      // Only show if top is materially above the rest: ≥1.5× the avg of others
+      // AND at least 5p above them. Otherwise it's just "the biggest" — not a spike.
+      if (top.cost >= avgOfOthers * 1.5 && top.cost - avgOfOthers >= 0.05) {
+        biggestSpike = await buildSpikeCallout(
+          { ...top.latestEvent, costGbp: top.cost },
+          slug
+        )
+      }
+    }
   }
 
   return {

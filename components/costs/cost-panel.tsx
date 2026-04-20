@@ -1,5 +1,6 @@
 import { getPostCost } from "@/modules/costs/actions/get-post-cost"
 import { Card } from "@/components/ui/card"
+import { formatGbp, formatUsd } from "@/lib/format"
 
 interface CostPanelProps {
   postId: string
@@ -21,9 +22,9 @@ export async function CostPanel({ postId }: CostPanelProps) {
       <div className="flex items-baseline justify-between border-b border-border pb-3 mb-3">
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Total cost</p>
-          <p className="text-2xl font-semibold">£{summary.totalGbp.toFixed(3)}</p>
+          <p className="text-2xl font-semibold">{formatGbp(summary.totalGbp)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            ${summary.totalUsd.toFixed(4)} USD · {summary.callCount} calls
+            {formatUsd(summary.totalUsd)} USD · {summary.callCount} calls
           </p>
         </div>
         {summary.vsAvgPercent !== null && (
@@ -54,7 +55,7 @@ export async function CostPanel({ postId }: CostPanelProps) {
                 {formatUnits(g)}
               </p>
             </div>
-            <p className="text-sm">£{g.costGbp.toFixed(3)}</p>
+            <p className="text-sm">{formatGbp(g.costGbp)}</p>
           </li>
         ))}
       </ul>
@@ -78,7 +79,7 @@ export async function CostPanel({ postId }: CostPanelProps) {
                   <span className="text-red-400 ml-2">· {c.errorMessage}</span>
                 )}
               </span>
-              <span className="text-right">£{c.costGbp.toFixed(4)}</span>
+              <span className="text-right">{formatGbp(c.costGbp)}</span>
             </li>
           ))}
         </ul>
