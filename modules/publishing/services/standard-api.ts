@@ -1,6 +1,8 @@
 // modules/publishing/services/standard-api.ts
 // Adapter for the universal /api/publish/ contract used by Manus and Claude-built Vercel sites.
 
+import type { ExternalPostData } from "./wordpress"
+
 export interface ApiCategory {
   slug: string
   name: string
@@ -252,4 +254,72 @@ export async function uploadMedia(
 
   const result = (await res.json()) as { url: string }
   return result.url
+}
+
+interface StandardApiPost {
+  id: string
+  slug: string
+  title: string
+  url: string
+  excerpt: string
+  category: string
+  tags: string
+  publishedAt: string
+}
+
+interface StandardApiPostsResponse {
+  posts: StandardApiPost[]
+  total: number
+  page: number
+  perPage: number
+}
+
+/**
+ * Fetch all published posts from a Standard API site, paginated.
+ * Hard cap: 1000 posts (5 pages × 200/page).
+ * Throws a helpful error pointing to docs/links.md if the endpoint isn't deployed.
+ */
+export async function fetchPublishedPosts(
+  siteUrl: string,
+  apiKey: string
+): Promise<ExternalPostData[]> {
+  const all: ExternalPostData[] = []
+  const perPage = 200
+  const maxPages = 5
+
+  for (let page = 1; page <= maxPages; page++) {
+    const endpoint = `${apiUrl(siteUrl, "/posts")}?page=${page}&perPage=${perPage}`
+    const res = await fetch(endpoint, { headers: apiHeaders(apiKey) })
+
+    if (res.status === 404) {
+      throw new Error(
+        "Posts endpoint not available — site needs to add GET /api/publish/posts. See docs/links.md."
+      )
+    }
+    if (!res.ok) {
+      throw new Error(
+        `Standard API fetchPublishedPosts page ${page}: ${res.status} ${res.statusText}`
+      )
+    }
+
+    const body = (await res.json()) as StandardApiPostsResponse
+    if (!body.posts || body.posts.length === 0) break
+
+    for (const p of body.posts) {
+      all.push({
+        externalId: p.id,
+        slug: p.slug,
+        title: p.title,
+        url: p.url,
+        excerpt: p.excerpt || null,
+        category: p.category || null,
+        tags: p.tags || null,
+        publishedAt: p.publishedAt ? new Date(p.publishedAt) : null,
+      })
+    }
+
+    if (page * perPage >= body.total) break
+  }
+
+  return all
 }
