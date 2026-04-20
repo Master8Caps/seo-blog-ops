@@ -217,7 +217,10 @@ export async function generatePost(
           `imagePrompts missing from Claude response (got ${typeof blog.imagePrompts})`
         )
       }
-      const result = await generateAndUploadImages(post.id, blog.imagePrompts)
+      const result = await generateAndUploadImages(post.id, blog.imagePrompts, {
+        siteId,
+        jobId,
+      })
       images = result.images
       imageErrors = result.errors
     } catch (error) {

@@ -1,5 +1,5 @@
-import { GoogleGenAI } from "@google/genai"
 import { createClient } from "@supabase/supabase-js"
+import { generateImage } from "@/lib/usage/gemini"
 
 export interface ImagePrompt {
   section: string
@@ -38,7 +38,8 @@ const GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image-preview"
 
 export async function generateAndUploadImages(
   postId: string,
-  imagePrompts: ImagePrompt[]
+  imagePrompts: ImagePrompt[],
+  attribution: { siteId: string; jobId?: string }
 ): Promise<ImageGenerationResult> {
   const apiKey = process.env.GOOGLE_AI_API_KEY
   if (!apiKey) {
@@ -59,7 +60,6 @@ export async function generateAndUploadImages(
     `[image-generator] post=${postId} starting (${imagePrompts.length} prompts, model=${GEMINI_IMAGE_MODEL})`
   )
 
-  const ai = new GoogleGenAI({ apiKey })
   const supabase = createStorageClient()
   const images: GeneratedImage[] = []
   const errors: string[] = []
@@ -67,37 +67,24 @@ export async function generateAndUploadImages(
   for (const { section, prompt } of imagePrompts) {
     try {
       console.info(`[image-generator] post=${postId} section=${section} → Gemini`)
-      const response = await ai.models.generateContent({
+      const { imageBytes, mimeType } = await generateImage({
         model: GEMINI_IMAGE_MODEL,
-        contents: `Generate a professional, high-quality blog image: ${prompt}. Style: clean, modern, suitable for a professional blog post. No text overlays.`,
-        config: {
-          // Gemini image generation requires both TEXT and IMAGE modalities
-          responseModalities: ["TEXT", "IMAGE"],
+        prompt: `Generate a professional, high-quality blog image: ${prompt}. Style: clean, modern, suitable for a professional blog post. No text overlays.`,
+        operation: "image-gen",
+        attribution: {
+          siteId: attribution.siteId,
+          postId,
+          jobId: attribution.jobId,
         },
       })
 
-      const parts = response.candidates?.[0]?.content?.parts ?? []
-      const imagePart = parts.find(
-        (p) => p.inlineData?.mimeType?.startsWith("image/")
-      )
-
-      if (!imagePart?.inlineData) {
-        const reason = response.candidates?.[0]?.finishReason ?? "no image in response"
-        console.warn(
-          `[image-generator] post=${postId} section=${section} ✗ no image returned (${reason})`
-        )
-        errors.push(`${section}: ${reason}`)
-        continue
-      }
-
-      const buffer = Buffer.from(imagePart.inlineData.data!, "base64")
-      const ext = imagePart.inlineData.mimeType === "image/webp" ? "webp" : "png"
+      const ext = mimeType === "image/webp" ? "webp" : "png"
       const filePath = `posts/${postId}/${section}.${ext}`
 
       const { error: uploadError } = await supabase.storage
         .from("post-images")
-        .upload(filePath, buffer, {
-          contentType: imagePart.inlineData.mimeType ?? "image/png",
+        .upload(filePath, imageBytes, {
+          contentType: mimeType,
           upsert: true,
         })
 
