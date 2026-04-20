@@ -202,3 +202,90 @@ export async function createPost(
 
   return (await res.json()) as WPPost
 }
+
+// ---------------------------------------------------------------------------
+// Published posts fetch (for external_posts cache seeding / re-sync)
+// ---------------------------------------------------------------------------
+
+export interface WordPressConfig {
+  siteUrl: string
+  username: string
+  appPassword: string
+}
+
+export interface ExternalPostData {
+  externalId: string
+  slug: string
+  title: string
+  url: string
+  excerpt: string | null
+  category: string | null
+  tags: string | null
+  publishedAt: Date | null
+}
+
+interface WPPublishedPost {
+  id: number
+  date: string
+  slug: string
+  link: string
+  title: { rendered: string }
+  excerpt: { rendered: string }
+  categories: number[]
+}
+
+function stripHtml(s: string): string {
+  return s
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+/**
+ * Fetch all published posts from a WordPress site, paginated.
+ * Hard cap: 1000 posts (10 pages × 100/page).
+ * WordPress returns 400 when paginating past the last page — that's the normal end-of-pagination signal.
+ */
+export async function fetchPublishedPosts(
+  config: WordPressConfig
+): Promise<ExternalPostData[]> {
+  const all: ExternalPostData[] = []
+  const perPage = 100
+  const maxPages = 10
+  const auth = authHeader(config.username, config.appPassword)
+  const base = config.siteUrl.replace(/\/+$/, "")
+
+  for (let page = 1; page <= maxPages; page++) {
+    const url = `${base}/wp-json/wp/v2/posts?status=publish&per_page=${perPage}&page=${page}&_fields=id,date,slug,link,title,excerpt,categories`
+    const res = await fetch(url, { headers: { Authorization: auth } })
+
+    if (res.status === 400) break // past last page
+
+    if (!res.ok) {
+      throw new Error(
+        `WordPress fetchPublishedPosts page ${page}: ${res.status} ${res.statusText}`
+      )
+    }
+
+    const posts = (await res.json()) as WPPublishedPost[]
+    if (posts.length === 0) break
+
+    for (const p of posts) {
+      all.push({
+        externalId: String(p.id),
+        slug: p.slug,
+        title: stripHtml(p.title?.rendered ?? ""),
+        url: p.link,
+        excerpt: p.excerpt?.rendered ? stripHtml(p.excerpt.rendered) : null,
+        category: null, // WP returns category IDs only; resolution out of scope for v1
+        tags: null, // same
+        publishedAt: p.date ? new Date(p.date) : null,
+      })
+    }
+
+    if (posts.length < perPage) break
+  }
+
+  return all
+}
