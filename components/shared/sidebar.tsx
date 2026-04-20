@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  BookOpen,
 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -39,6 +40,7 @@ const mainNavItems = [
   { href: "/content", label: "Content", icon: FileText, badgeKey: null as null | "activity" },
   { href: "/activity", label: "Activity", icon: Activity, badgeKey: "activity" as const },
   { href: "/costs", label: "Costs", icon: Wallet, badgeKey: null as null | "activity" },
+  { href: "/how-it-works", label: "How it works", icon: BookOpen, badgeKey: null as null | "activity" },
 ]
 
 interface SidebarProps {
