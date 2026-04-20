@@ -163,6 +163,44 @@ async function publishToStandardApi(
       },
     })
 
+    // Append to external_posts cache so future generations can link to this post.
+    // Wrapped in try/catch — never block publish on cache write.
+    try {
+      await prisma.externalPost.upsert({
+        where: {
+          siteId_externalId: {
+            siteId: site.id,
+            externalId: String(result.slug),
+          },
+        },
+        create: {
+          siteId: site.id,
+          externalId: String(result.slug),
+          slug: post.slug,
+          title: post.title,
+          url: result.publishedUrl,
+          excerpt: post.excerpt ?? null,
+          category: post.category ?? null,
+          tags: post.tags ?? null,
+          publishedAt: new Date(),
+          source: "publish",
+        },
+        update: {
+          slug: post.slug,
+          title: post.title,
+          url: result.publishedUrl,
+          excerpt: post.excerpt ?? null,
+          category: post.category ?? null,
+          tags: post.tags ?? null,
+          publishedAt: new Date(),
+          syncedAt: new Date(),
+          source: "publish",
+        },
+      })
+    } catch (err) {
+      console.error("[publish-post] failed to append to external_posts cache:", err)
+    }
+
     revalidatePaths(post.id, site.slug)
     return { success: true, publishedUrl: result.publishedUrl }
   } catch (error) {
@@ -178,7 +216,7 @@ async function publishToStandardApi(
 // ---------------------------------------------------------------------------
 
 async function publishToWordPress(
-  post: { id: string; title: string; slug: string; content: string; featuredImg: string | null; category: string | null; tags: string | null },
+  post: { id: string; title: string; slug: string; content: string; excerpt: string | null; featuredImg: string | null; category: string | null; tags: string | null },
   site: { id: string; slug: string; url: string; publishConfig: unknown },
   jobId?: string
 ): Promise<PublishResult> {
@@ -274,6 +312,44 @@ async function publishToWordPress(
         publishedAt: new Date(),
       },
     })
+
+    // Append to external_posts cache so future generations can link to this post.
+    // Wrapped in try/catch — never block publish on cache write.
+    try {
+      await prisma.externalPost.upsert({
+        where: {
+          siteId_externalId: {
+            siteId: site.id,
+            externalId: String(wpPost.id),
+          },
+        },
+        create: {
+          siteId: site.id,
+          externalId: String(wpPost.id),
+          slug: post.slug,
+          title: post.title,
+          url: wpPost.link,
+          excerpt: post.excerpt ?? null,
+          category: post.category ?? null,
+          tags: post.tags ?? null,
+          publishedAt: new Date(),
+          source: "publish",
+        },
+        update: {
+          slug: post.slug,
+          title: post.title,
+          url: wpPost.link,
+          excerpt: post.excerpt ?? null,
+          category: post.category ?? null,
+          tags: post.tags ?? null,
+          publishedAt: new Date(),
+          syncedAt: new Date(),
+          source: "publish",
+        },
+      })
+    } catch (err) {
+      console.error("[publish-post] failed to append to external_posts cache:", err)
+    }
 
     revalidatePaths(post.id, site.slug)
     return { success: true, publishedUrl: wpPost.link }
