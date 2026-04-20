@@ -46,11 +46,12 @@ model Site {
   lastCrawledAt    DateTime? @map("last_crawled_at")
 
   // Relations
-  keywords     Keyword[]
-  posts        Post[]
-  jobs         JobQueue[]
-  researchRuns ResearchRun[]
-  usageEvents  UsageEvent[]
+  keywords      Keyword[]
+  posts         Post[]
+  jobs          JobQueue[]
+  researchRuns  ResearchRun[]
+  usageEvents   UsageEvent[]
+  externalPosts ExternalPost[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -215,4 +216,24 @@ model UsageEvent {
   @@index([createdAt(sort: Desc)])
   @@index([provider])
   @@map("usage_events")
+}
+
+model ExternalPost {
+  id           String    @id @default(uuid())
+  siteId       String    @map("site_id")
+  site         Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  externalId   String    @map("external_id")
+  slug         String
+  title        String
+  url          String
+  excerpt      String?
+  category     String?
+  tags         String?
+  publishedAt  DateTime? @map("published_at")
+  syncedAt     DateTime  @default(now()) @map("synced_at")
+  source       String    // 'sync' | 'publish'
+
+  @@unique([siteId, externalId])
+  @@index([siteId])
+  @@map("external_posts")
 }
