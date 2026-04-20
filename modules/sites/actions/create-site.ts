@@ -67,7 +67,7 @@ export async function crawlAndAnalyzeSite(
   })
 
   try {
-    const crawlResult = await crawlSite(site.url)
+    const crawlResult = await crawlSite(site.url, siteId)
     if (crawlResult.pages.length === 0) {
       await prisma.site.update({
         where: { id: siteId },

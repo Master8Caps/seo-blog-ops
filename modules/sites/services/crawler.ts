@@ -1,8 +1,8 @@
+import { readUrl } from "@/lib/usage/jina"
 import type { CrawledPage, CrawlResult } from "../types"
 
 const MAX_PAGES = 10
 const MAX_CONTENT_LENGTH = 5000 // per page, in characters
-const JINA_PREFIX = "https://r.jina.ai/"
 
 function extractTitle(text: string): string {
   const match = text.match(/^Title:\s*(.+)$/m)
@@ -32,29 +32,29 @@ function extractLinks(text: string, baseUrl: string): string[] {
   return [...new Set(links)]
 }
 
-async function fetchRenderedPage(url: string): Promise<{ content: string | null; error?: string }> {
+async function fetchRenderedPage(
+  url: string,
+  siteId: string | undefined
+): Promise<{ content: string | null; error?: string }> {
   try {
-    const response = await fetch(`${JINA_PREFIX}${url}`, {
-      headers: {
-        "Accept": "text/plain",
-        "X-No-Cache": "true",
-      },
-      signal: AbortSignal.timeout(15000),
+    const res = await readUrl({
+      url,
+      operation: "crawl",
+      attribution: { siteId },
     })
-    if (!response.ok) {
-      return { content: null, error: `Jina returned HTTP ${response.status}` }
+    if (!res.ok) {
+      return { content: null, error: `Jina returned HTTP ${res.status}` }
     }
-    const text = await response.text()
-    if (!text || text.length < 20) {
+    if (!res.text || res.text.length < 20) {
       return { content: null, error: "Empty response from renderer" }
     }
-    return { content: text }
+    return { content: res.text }
   } catch (e) {
     return { content: null, error: e instanceof Error ? e.message : "Unknown fetch error" }
   }
 }
 
-export async function crawlSite(url: string): Promise<CrawlResult> {
+export async function crawlSite(url: string, siteId?: string): Promise<CrawlResult> {
   const visited = new Set<string>()
   const pages: CrawledPage[] = []
   const errors: string[] = []
@@ -68,7 +68,7 @@ export async function crawlSite(url: string): Promise<CrawlResult> {
     if (visited.has(normalizedUrl)) continue
     visited.add(normalizedUrl)
 
-    const result = await fetchRenderedPage(normalizedUrl)
+    const result = await fetchRenderedPage(normalizedUrl, siteId)
     if (!result.content) {
       errors.push(`Failed to fetch ${normalizedUrl}: ${result.error ?? "unknown"}`)
       continue
