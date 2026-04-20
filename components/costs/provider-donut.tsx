@@ -16,7 +16,14 @@ export function ProviderDonut({ providers }: ProviderDonutProps) {
   const radius = 50
   const stroke = 14
   const circumference = 2 * Math.PI * radius
-  let cumulative = 0
+
+  // Pre-compute cumulative offsets so we don't mutate inside .map()
+  const offsets: number[] = []
+  let running = 0
+  for (const p of providers) {
+    offsets.push(running)
+    running += p.pct
+  }
 
   return (
     <Card className="p-4">
@@ -28,8 +35,7 @@ export function ProviderDonut({ providers }: ProviderDonutProps) {
           <svg width="120" height="120" viewBox="0 0 120 120">
             {providers.map((p, i) => {
               const dash = (p.pct / 100) * circumference
-              const offset = -((cumulative / 100) * circumference)
-              cumulative += p.pct
+              const offset = -((offsets[i] / 100) * circumference)
               return (
                 <circle
                   key={p.provider}
