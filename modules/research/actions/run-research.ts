@@ -28,7 +28,10 @@ interface StepResult {
  * Step 1: Discover keywords from seed keywords via DataForSEO
  * Saves raw keywords to DB immediately (no AI scoring yet)
  */
-export async function discoverFromSeeds(siteId: string): Promise<StepResult> {
+export async function discoverFromSeeds(
+  siteId: string,
+  runId?: string
+): Promise<StepResult> {
   const site = await prisma.site.findUnique({ where: { id: siteId } })
   if (!site) return { success: false, keywordsFound: 0, error: "Site not found" }
 
@@ -46,9 +49,15 @@ export async function discoverFromSeeds(siteId: string): Promise<StepResult> {
   try {
     const results = await keywordsForKeywords(seedKeywords, {
       siteId,
-      researchRunId: undefined,
+      researchRunId: runId,
     })
     const saved = await saveKeywords(siteId, results)
+    if (runId) {
+      await prisma.researchRun.update({
+        where: { id: runId },
+        data: { keywordsDiscovered: { increment: saved } },
+      })
+    }
     revalidatePath(`/sites/${site.slug}/research`)
     return { success: true, keywordsFound: saved }
   } catch (error) {
@@ -64,16 +73,25 @@ export async function discoverFromSeeds(siteId: string): Promise<StepResult> {
  * Step 2: Discover keywords from site URL via DataForSEO
  * Saves raw keywords to DB immediately (no AI scoring yet)
  */
-export async function discoverFromSite(siteId: string): Promise<StepResult> {
+export async function discoverFromSite(
+  siteId: string,
+  runId?: string
+): Promise<StepResult> {
   const site = await prisma.site.findUnique({ where: { id: siteId } })
   if (!site) return { success: false, keywordsFound: 0, error: "Site not found" }
 
   try {
     const results = await keywordsForSite(site.url, {
       siteId,
-      researchRunId: undefined,
+      researchRunId: runId,
     })
     const saved = await saveKeywords(siteId, results)
+    if (runId) {
+      await prisma.researchRun.update({
+        where: { id: runId },
+        data: { keywordsDiscovered: { increment: saved } },
+      })
+    }
     revalidatePath(`/sites/${site.slug}/research`)
     return { success: true, keywordsFound: saved }
   } catch (error) {
@@ -89,7 +107,10 @@ export async function discoverFromSite(siteId: string): Promise<StepResult> {
  * Step 3: Score top keywords with AI
  * Takes the top N keywords by search volume that don't have scores yet, scores them
  */
-export async function scoreTopKeywords(siteId: string): Promise<StepResult> {
+export async function scoreTopKeywords(
+  siteId: string,
+  runId?: string
+): Promise<StepResult> {
   const site = await prisma.site.findUnique({ where: { id: siteId } })
   if (!site) return { success: false, keywordsFound: 0, error: "Site not found" }
 
@@ -113,7 +134,7 @@ export async function scoreTopKeywords(siteId: string): Promise<StepResult> {
         keywords: unscored.map((k) => k.keyword),
       },
       siteId,
-      undefined
+      runId
     )
 
     const scoreMap = new Map(
@@ -143,6 +164,16 @@ export async function scoreTopKeywords(siteId: string): Promise<StepResult> {
       },
     })
 
+    if (runId) {
+      const scoredCount = await prisma.keyword.count({
+        where: { siteId, relevanceScore: { not: null } },
+      })
+      await prisma.researchRun.update({
+        where: { id: runId },
+        data: { keywordsScored: scoredCount },
+      })
+    }
+
     revalidatePath(`/sites/${site.slug}/research`)
     revalidatePath(`/sites/${site.slug}`)
     revalidatePath("/sites")
@@ -159,7 +190,10 @@ export async function scoreTopKeywords(siteId: string): Promise<StepResult> {
 /**
  * Step 4: AI selects the best ~15 keywords and auto-approves them
  */
-export async function selectKeywords(siteId: string): Promise<StepResult> {
+export async function selectKeywords(
+  siteId: string,
+  runId?: string
+): Promise<StepResult> {
   const site = await prisma.site.findUnique({ where: { id: siteId } })
   if (!site) return { success: false, keywordsFound: 0, error: "Site not found" }
 
@@ -196,7 +230,7 @@ export async function selectKeywords(siteId: string): Promise<StepResult> {
         messages: [{ role: "user", content: prompt }],
       },
       operation: "select-keywords",
-      attribution: { siteId, researchRunId: undefined },
+      attribution: { siteId, researchRunId: runId },
     })
 
     const textBlock = message.content.find((block) => block.type === "text")
@@ -223,6 +257,13 @@ export async function selectKeywords(siteId: string): Promise<StepResult> {
       }
     }
 
+    if (runId) {
+      await prisma.researchRun.update({
+        where: { id: runId },
+        data: { keywordsAiPicked: approved },
+      })
+    }
+
     revalidatePath(`/sites/${site.slug}/research`)
     revalidatePath(`/sites/${site.slug}`)
     revalidatePath("/sites")
@@ -234,6 +275,49 @@ export async function selectKeywords(siteId: string): Promise<StepResult> {
       error: `AI selection failed: ${error instanceof Error ? error.message : "Unknown error"}`,
     }
   }
+}
+
+export async function startResearchRun(
+  siteId: string,
+  userId?: string
+): Promise<{ runId: string }> {
+  const run = await prisma.researchRun.create({
+    data: {
+      siteId,
+      status: "running",
+      triggeredByUserId: userId ?? null,
+    },
+  })
+  return { runId: run.id }
+}
+
+export async function finishResearchRun(
+  runId: string,
+  status: "completed" | "failed"
+): Promise<void> {
+  await prisma.researchRun.update({
+    where: { id: runId },
+    data: { status, completedAt: new Date() },
+  })
+}
+
+/**
+ * Find the most recent `running` research run for this site, or create a new one.
+ * Used when steps are triggered as separate user actions — keeps them grouped under
+ * one logical run as long as no run has been finished.
+ */
+export async function findOrStartResearchRun(
+  siteId: string,
+  userId?: string
+): Promise<{ runId: string }> {
+  const existing = await prisma.researchRun.findFirst({
+    where: { siteId, status: "running" },
+    orderBy: { startedAt: "desc" },
+  })
+  if (existing) {
+    return { runId: existing.id }
+  }
+  return startResearchRun(siteId, userId)
 }
 
 /** Save keywords to DB, deduplicating by keyword text */

@@ -11,6 +11,8 @@ import {
   discoverFromSite,
   scoreTopKeywords,
   selectKeywords,
+  startResearchRun,
+  finishResearchRun,
 } from "@/modules/research/actions/run-research"
 import { getKeywordsForSiteId, getKeywordStats, clearKeywords } from "@/modules/research/actions/get-keywords"
 import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
@@ -62,43 +64,52 @@ export default function ResearchPage() {
     setSuccessMsg(null)
     let totalFound = 0
 
-    // Step 1: Discover from seed keywords
-    setResearchStep("Discovering from seed keywords...")
-    const seedResult = await discoverFromSeeds(siteId)
-    if (seedResult.success) {
-      totalFound += seedResult.keywordsFound
-      await refreshData()
-    }
+    const { runId } = await startResearchRun(siteId)
 
-    // Step 2: Discover from site URL
-    setResearchStep("Discovering from site URL...")
-    const siteResult = await discoverFromSite(siteId)
-    if (siteResult.success) {
-      totalFound += siteResult.keywordsFound
-      await refreshData()
-    }
+    try {
+      // Step 1: Discover from seed keywords
+      setResearchStep("Discovering from seed keywords...")
+      const seedResult = await discoverFromSeeds(siteId, runId)
+      if (seedResult.success) {
+        totalFound += seedResult.keywordsFound
+        await refreshData()
+      }
 
-    // Step 3: AI scoring on top keywords
-    setResearchStep("Scoring top keywords with AI...")
-    const scoreResult = await scoreTopKeywords(siteId)
-    if (scoreResult.success) {
-      await refreshData()
-    }
+      // Step 2: Discover from site URL
+      setResearchStep("Discovering from site URL...")
+      const siteResult = await discoverFromSite(siteId, runId)
+      if (siteResult.success) {
+        totalFound += siteResult.keywordsFound
+        await refreshData()
+      }
 
-    // Step 4: AI select best keywords
-    setResearchStep("Selecting best keywords...")
-    const selectResult = await selectKeywords(siteId)
-    if (selectResult.success) {
-      await refreshData()
-    }
+      // Step 3: AI scoring on top keywords
+      setResearchStep("Scoring top keywords with AI...")
+      const scoreResult = await scoreTopKeywords(siteId, runId)
+      if (scoreResult.success) {
+        await refreshData()
+      }
 
-    // Report errors if both discovery steps failed
-    if (!seedResult.success && !siteResult.success) {
-      setError(seedResult.error ?? siteResult.error ?? "Research failed")
-    } else {
-      const scored = scoreResult.success ? scoreResult.keywordsFound : 0
-      const selected = selectResult.success ? selectResult.keywordsFound : 0
-      setSuccessMsg(`Found ${totalFound} keywords, scored ${scored}, selected ${selected}`)
+      // Step 4: AI select best keywords
+      setResearchStep("Selecting best keywords...")
+      const selectResult = await selectKeywords(siteId, runId)
+      if (selectResult.success) {
+        await refreshData()
+      }
+
+      // Report errors if both discovery steps failed
+      if (!seedResult.success && !siteResult.success) {
+        setError(seedResult.error ?? siteResult.error ?? "Research failed")
+        await finishResearchRun(runId, "failed")
+      } else {
+        const scored = scoreResult.success ? scoreResult.keywordsFound : 0
+        const selected = selectResult.success ? selectResult.keywordsFound : 0
+        setSuccessMsg(`Found ${totalFound} keywords, scored ${scored}, selected ${selected}`)
+        await finishResearchRun(runId, "completed")
+      }
+    } catch (err) {
+      await finishResearchRun(runId, "failed")
+      setError(err instanceof Error ? err.message : "Research failed")
     }
 
     setResearchStep("")
