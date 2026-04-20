@@ -30,6 +30,8 @@ import {
   getPublishingConfig,
   disconnectPublishing,
 } from "@/modules/publishing/actions/connect-site"
+import { resyncExternalPosts } from "@/modules/publishing/actions/resync-posts"
+import { getExternalPostCount } from "@/modules/publishing/actions/get-external-post-count"
 
 type Platform = "api" | "wordpress" | null
 
@@ -41,9 +43,12 @@ export default function PublishingSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [testing, setTesting] = useState(false)
   const [resyncing, setResyncing] = useState(false)
+  const [resyncingPosts, setResyncingPosts] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [postsWarning, setPostsWarning] = useState<string | null>(null)
+  const [externalPostCount, setExternalPostCount] = useState(0)
 
   // Platform selection
   const [platform, setPlatform] = useState<Platform>(null)
@@ -87,6 +92,10 @@ export default function PublishingSettingsPage() {
         setAutoPublishOnApproval(config.autoPublishOnApproval)
         if (config.taxonomy) setTaxonomy(config.taxonomy)
       }
+
+      const count = await getExternalPostCount(site.id)
+      setExternalPostCount(count)
+
       setLoading(false)
     }
     load()
@@ -113,10 +122,14 @@ export default function PublishingSettingsPage() {
     setSuccessMsg(
       `Connected! Synced ${result.categoryCount} categories, ${result.tagCount} tags, and ${result.contextGroupCount} context groups.`
     )
+    setPostsWarning(result.postsWarning ?? null)
     setApiKey("")
 
     const config = await getPublishingConfig(siteId)
     if (config?.taxonomy) setTaxonomy(config.taxonomy)
+
+    const count = await getExternalPostCount(siteId)
+    setExternalPostCount(count)
 
     setTesting(false)
   }
@@ -143,10 +156,14 @@ export default function PublishingSettingsPage() {
     setSuccessMsg(
       `Connected successfully! Synced ${result.categoryCount} categories and ${result.tagCount} tags.`
     )
+    setPostsWarning(result.postsWarning ?? null)
     setWpPassword("")
 
     const config = await getPublishingConfig(siteId)
     if (config?.taxonomy) setTaxonomy(config.taxonomy)
+
+    const count = await getExternalPostCount(siteId)
+    setExternalPostCount(count)
 
     setTesting(false)
   }
@@ -169,6 +186,24 @@ export default function PublishingSettingsPage() {
     }
 
     setResyncing(false)
+  }
+
+  async function handleResyncPosts() {
+    setResyncingPosts(true)
+    setError(null)
+    setPostsWarning(null)
+
+    const result = await resyncExternalPosts(siteId)
+
+    if (!result.ok) {
+      setPostsWarning(result.error ?? "Posts re-sync failed")
+    } else {
+      setSuccessMsg(`Re-synced ${result.count} cached posts.`)
+      const count = await getExternalPostCount(siteId)
+      setExternalPostCount(count)
+    }
+
+    setResyncingPosts(false)
   }
 
   async function handleToggle(
@@ -359,29 +394,61 @@ export default function PublishingSettingsPage() {
 
       {/* Connection status */}
       {isConnected && (
-        <div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3">
-          <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-green-500">
-              Connected{connectedUser ? ` as ${connectedUser}` : ""}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {taxonomy
-                ? `${taxonomy.categories.length} categories · ${tagCount} tags${
-                    taxonomy.context?.length ? ` · ${taxonomy.context.length} context groups` : ""
-                  } · Last synced: ${new Date(taxonomy.lastSyncedAt).toLocaleDateString()}`
-                : "Metadata synced"}
-            </p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3">
+            <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-green-500">
+                Connected{connectedUser ? ` as ${connectedUser}` : ""}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {taxonomy ? (
+                  <>
+                    <span>{taxonomy.categories.length} categories</span>
+                    <span> · </span>
+                    <span>{tagCount} tags</span>
+                    {taxonomy.context?.length ? (
+                      <>
+                        <span> · </span>
+                        <span>{taxonomy.context.length} context groups</span>
+                      </>
+                    ) : null}
+                    <span> · </span>
+                    <span>Cached posts: {externalPostCount}</span>
+                    <span> · </span>
+                    <span>Last synced: {new Date(taxonomy.lastSyncedAt).toLocaleDateString()}</span>
+                  </>
+                ) : (
+                  <>Cached posts: {externalPostCount}</>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleResync}
+                disabled={resyncing || resyncingPosts}
+              >
+                <RefreshCw className={`h-4 w-4 ${resyncing ? "animate-spin" : ""}`} />
+                <span className="ml-1.5">Re-sync metadata</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResyncPosts}
+                disabled={resyncing || resyncingPosts}
+              >
+                <RefreshCw className={`h-4 w-4 ${resyncingPosts ? "animate-spin" : ""}`} />
+                <span className="ml-1.5">Re-sync posts from site</span>
+              </Button>
+            </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleResync}
-            disabled={resyncing}
-          >
-            <RefreshCw className={`h-4 w-4 ${resyncing ? "animate-spin" : ""}`} />
-            <span className="ml-1.5">Re-sync</span>
-          </Button>
+          {postsWarning && (
+            <div className="text-amber-500 text-sm bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+              Posts sync warning: {postsWarning}
+            </div>
+          )}
         </div>
       )}
 
