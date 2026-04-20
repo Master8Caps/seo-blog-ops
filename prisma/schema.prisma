@@ -46,9 +46,11 @@ model Site {
   lastCrawledAt    DateTime? @map("last_crawled_at")
 
   // Relations
-  keywords Keyword[]
-  posts    Post[]
-  jobs     JobQueue[]
+  keywords     Keyword[]
+  posts        Post[]
+  jobs         JobQueue[]
+  researchRuns ResearchRun[]
+  usageEvents  UsageEvent[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -126,6 +128,8 @@ model Post {
   generatedBy   String? @map("generated_by")
   promptVersion String? @map("prompt_version")
 
+  usageEvents UsageEvent[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -143,5 +147,72 @@ model JobQueue {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  usageEvents UsageEvent[]
+
   @@map("job_queue")
+}
+
+model ExchangeRate {
+  date      DateTime @id @db.Date
+  usdGbp    Decimal  @map("usd_gbp") @db.Decimal(10, 6)
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  @@map("exchange_rates")
+}
+
+model ResearchRun {
+  id                  String    @id @default(uuid())
+  siteId              String    @map("site_id")
+  site                Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  startedAt           DateTime  @default(now()) @map("started_at")
+  completedAt         DateTime? @map("completed_at")
+  status              String    @default("running")
+  keywordsDiscovered  Int       @default(0) @map("keywords_discovered")
+  keywordsScored      Int       @default(0) @map("keywords_scored")
+  keywordsAiPicked    Int       @default(0) @map("keywords_ai_picked")
+  triggeredByUserId   String?   @map("triggered_by_user_id")
+
+  usageEvents UsageEvent[]
+
+  @@index([siteId, startedAt(sort: Desc)])
+  @@map("research_runs")
+}
+
+model UsageEvent {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  provider  String
+  model     String?
+  operation String
+
+  inputTokens   Int? @map("input_tokens")
+  outputTokens  Int? @map("output_tokens")
+  wordCount     Int? @map("word_count")
+  imageCount    Int? @map("image_count")
+  apiCallCount  Int? @map("api_call_count")
+
+  costUsd      Decimal @map("cost_usd")      @db.Decimal(10, 6)
+  costGbp      Decimal @map("cost_gbp")      @db.Decimal(10, 6)
+  exchangeRate Decimal @map("exchange_rate") @db.Decimal(10, 6)
+
+  siteId         String?      @map("site_id")
+  site           Site?        @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  postId         String?      @map("post_id")
+  post           Post?        @relation(fields: [postId], references: [id], onDelete: SetNull)
+  researchRunId  String?      @map("research_run_id")
+  researchRun    ResearchRun? @relation(fields: [researchRunId], references: [id], onDelete: SetNull)
+  jobId          String?      @map("job_id")
+  job            JobQueue?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  metadata     Json?
+  durationMs   Int?    @map("duration_ms")
+  errorMessage String? @map("error_message")
+
+  @@index([postId])
+  @@index([siteId])
+  @@index([researchRunId])
+  @@index([createdAt(sort: Desc)])
+  @@index([provider])
+  @@map("usage_events")
 }
