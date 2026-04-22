@@ -11,68 +11,81 @@ interface LogoProps {
 export function Logo({ collapsed, className }: LogoProps) {
   return (
     <Link href="/dashboard" className={cn("flex items-center gap-3", className)}>
-      {/* Icon — pen nib that doubles as an upward arrow */}
-      <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary shadow-md shadow-primary/25">
+      {collapsed ? (
         <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          className="h-5 w-5"
+          viewBox="0 0 32 40"
+          width="28"
+          height="32"
           xmlns="http://www.w3.org/2000/svg"
+          className="shrink-0 text-foreground"
+          aria-label="SEO Blog Ops"
         >
-          {/* Paper - slightly rotated for depth */}
-          <rect
-            x="5"
-            y="3"
-            width="13"
-            height="17"
-            rx="1.5"
-            fill="currentColor"
-            className="text-primary-foreground/30"
-          />
-          {/* Paper front */}
-          <rect
-            x="4"
-            y="4"
-            width="13"
-            height="17"
-            rx="1.5"
-            fill="currentColor"
-            className="text-primary-foreground"
-          />
-          {/* Text lines on paper */}
-          <path
-            d="M7 9H14M7 12H12M7 15H10"
+          <circle
+            cx="13"
+            cy="18"
+            r="10"
+            fill="none"
             stroke="currentColor"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-            className="text-primary"
+            strokeWidth="6"
           />
-          {/* Pen - diagonal across the paper */}
-          <path
-            d="M14 7L19.5 1.5"
+          <line
+            x1="25"
+            y1="30"
+            x2="32"
+            y2="37"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="6"
             strokeLinecap="round"
-            className="text-primary-foreground"
-          />
-          <path
-            d="M13 8L14 7"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            className="text-primary-foreground/70"
           />
         </svg>
-      </div>
-      {!collapsed && (
-        <div className="flex flex-col">
-          <span className="text-sm font-bold leading-none tracking-tight">
-            SEO Blog
-          </span>
-          <span className="text-xs font-medium leading-none text-muted-foreground mt-1">
-            Ops
-          </span>
-        </div>
+      ) : (
+        <>
+          <svg
+            viewBox="0 0 84 40"
+            width="72"
+            height="34"
+            xmlns="http://www.w3.org/2000/svg"
+            className="shrink-0 text-foreground"
+            aria-label="SEO"
+          >
+            <text
+              x="1"
+              y="30"
+              fontFamily="'Arial Black', 'Helvetica Neue', Helvetica, Arial, sans-serif"
+              fontWeight="900"
+              fontSize="34"
+              letterSpacing="-1.5"
+              fill="currentColor"
+            >
+              SE
+            </text>
+            <circle
+              cx="60"
+              cy="18"
+              r="10"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="6"
+            />
+            <line
+              x1="72"
+              y1="30"
+              x2="79"
+              y2="37"
+              stroke="currentColor"
+              strokeWidth="6"
+              strokeLinecap="round"
+            />
+          </svg>
+          <div className="flex flex-col">
+            <span className="text-sm font-bold leading-none tracking-tight">
+              Blog
+            </span>
+            <span className="mt-1 text-xs font-medium leading-none text-muted-foreground">
+              Ops
+            </span>
+          </div>
+        </>
       )}
     </Link>
   )
