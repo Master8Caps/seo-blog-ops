@@ -11,6 +11,7 @@ export type Operation =
   | "crawl"
   | "kw-for-site"
   | "kw-for-keywords"
+  | "generate-angles"
 
 export interface Attribution {
   siteId?: string
