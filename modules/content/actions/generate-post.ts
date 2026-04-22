@@ -18,6 +18,7 @@ import {
   replaceImageMarkers,
 } from "../services/image-generator"
 import { getInternalLinkCandidates } from "../services/get-internal-link-candidates"
+import { getRecentKeywordsAndClusters } from "@/modules/content/services/get-recent-keywords"
 
 interface GeneratePostResult {
   success: boolean
@@ -86,6 +87,7 @@ export async function generatePost(
       // Only one keyword, use it as primary with no secondaries
       primaryKw = approvedKeywords[0]
     } else {
+      const recency = await getRecentKeywordsAndClusters(siteId)
       const selectionPrompt = buildKeywordGroupSelectionPrompt({
         siteNiche: site.niche ?? "unknown",
         siteAudience: site.audience ?? "unknown",
@@ -95,6 +97,8 @@ export async function generatePost(
           intent: k.intent,
           cluster: k.cluster,
         })),
+        recentKeywords: recency.keywords,
+        recentClusters: recency.clusters,
       })
 
       const selectionMsg = await createMessage({

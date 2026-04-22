@@ -46,6 +46,8 @@ export interface KeywordGroupSelectionInput {
     intent: string | null
     cluster: string | null
   }>
+  recentKeywords: string[]
+  recentClusters: string[]
 }
 
 export interface KeywordGroupSelectionResult {
@@ -61,6 +63,20 @@ export function buildKeywordGroupSelectionPrompt(input: KeywordGroupSelectionInp
     )
     .join("\n")
 
+  const recencyBlock =
+    input.recentKeywords.length === 0 && input.recentClusters.length === 0
+      ? "(none — this is a fresh site)"
+      : [
+          input.recentKeywords.length > 0
+            ? `Primary keywords recently used (last 20 posts or 30 days):\n${input.recentKeywords.map((k) => `- "${k}"`).join("\n")}`
+            : "",
+          input.recentClusters.length > 0
+            ? `Clusters over-represented right now:\n${input.recentClusters.map((c) => `- ${c}`).join("\n")}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n")
+
   return `You are an SEO strategist selecting keywords for a single blog post.
 
 Site niche: ${input.siteNiche}
@@ -68,8 +84,13 @@ Target audience: ${input.siteAudience}
 
 From the approved keywords below, select 1 primary keyword and 1-2 secondary keywords that work well together for a single blog post. The keywords should be thematically related so they can be naturally incorporated into one article.
 
+## Recency — deprioritise these
+${recencyBlock}
+
+Hard rule: DO NOT pick a primary keyword from the "recently used" list unless there is genuinely no other viable option. Prefer a primary from a different cluster than the over-represented ones when possible. Secondary keywords MAY overlap with recent ones — only the primary is restricted.
+
 Selection criteria:
-1. Pick a primary keyword with good search volume that will be the main focus
+1. Pick a primary keyword with good search volume that will be the main focus (obeying the recency rule above)
 2. Pick 1-2 secondary keywords that complement the primary — related topics, long-tail variations, or supporting concepts
 3. Avoid picking keywords that are too different to fit naturally in one post
 4. Prefer keywords from the same or adjacent clusters
