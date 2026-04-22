@@ -22,9 +22,16 @@ export interface BlogGenerationInput {
   primaryKeyword: KeywordForBlog
   secondaryKeywords: KeywordForBlog[]
   existingPosts: InternalLinkCandidate[]
+  selectedAngle: { id: string; text: string } | null
+  recentClusterPosts: Array<{
+    title: string
+    excerpt: string | null
+    angle: string | null
+  }>
 }
 
-export interface BlogGenerationResult {
+export interface BlogGenerationOk {
+  status: "ok"
   title: string
   slug: string
   metaTitle: string
@@ -36,6 +43,13 @@ export interface BlogGenerationResult {
     prompt: string
   }>
 }
+
+export interface BlogGenerationClusterExhausted {
+  status: "cluster_exhausted"
+  reasoning: string
+}
+
+export type BlogGenerationResult = BlogGenerationOk | BlogGenerationClusterExhausted
 
 export interface KeywordGroupSelectionInput {
   siteNiche: string
@@ -120,6 +134,24 @@ export function buildBlogGenerationPrompt(input: BlogGenerationInput): string {
     2
   )
 
+  const recentClusterJson = JSON.stringify(
+    input.recentClusterPosts.map((p) => ({
+      title: p.title,
+      excerpt: p.excerpt ?? "",
+      angle: p.angle ?? "",
+    })),
+    null,
+    2
+  )
+
+  const angleBlock = input.selectedAngle
+    ? `## Assigned angle
+
+Write this post from the angle: "${input.selectedAngle.text}"
+
+This is the specific frame/lens for the post. Everything — examples, sub-headings, reader segment — should flow from this angle. If this angle was recently used (see differentiation list below), you MUST write about the same angle with a different frame (different examples, different sub-topic, different reader segment).`
+    : ""
+
   return `You are an expert SEO blog writer. Write a comprehensive blog post optimized for multiple target keywords.
 
 Site niche: ${input.siteNiche}
@@ -133,6 +165,18 @@ Topic cluster: ${input.primaryKeyword.cluster ?? "general"}
 Monthly search volume: ${input.primaryKeyword.searchVolume ?? "unknown"}
 
 Secondary keywords to incorporate: ${secondaryList.length > 0 ? secondaryList.map((k) => `"${k}"`).join(", ") : "none"}
+
+${angleBlock}
+
+## Differentiation — do NOT duplicate these angles
+
+Recent posts on this site in the same cluster as your primary keyword:
+${recentClusterJson}
+
+Rules:
+- Your title MUST be meaningfully different from every title above. Paraphrasing the same idea doesn't count.
+- If your assigned angle appears in the list above, write about the same angle with a different frame.
+- If every sensible angle is already covered and you genuinely cannot write a non-duplicate post, return the escape-hatch response (see output schema below) instead of a normal post.
 
 ## CRITICAL RULE — keyword casing
 
@@ -196,9 +240,14 @@ ${existingPostsJson}
 
 4. One H1 only (the post title — already handled by your title field).
 
-Respond with ONLY valid JSON matching this exact structure (no markdown wrapping, no explanation):
+## Output schema
+
+Respond with ONLY valid JSON (no markdown wrapping, no explanation). The response is a DISCRIMINATED UNION — use status:"ok" for a normal post, status:"cluster_exhausted" to escalate.
+
+Normal post:
 {
-  "title": "Engaging blog post title — primary keyword in TITLE CASE (never lowercase, never sentence case)",
+  "status": "ok",
+  "title": "Engaging blog post title — primary keyword in TITLE CASE",
   "slug": "url-friendly-slug-derived-from-title (lowercase only)",
   "metaTitle": "SEO meta title, 50-60 characters — primary keyword in TITLE CASE",
   "metaDesc": "SEO meta description, 150-160 characters, compelling with primary keyword",
@@ -210,5 +259,11 @@ Respond with ONLY valid JSON matching this exact structure (no markdown wrapping
     { "section": "section-2", "prompt": "Detailed description for second section image" },
     { "section": "section-3", "prompt": "Detailed description for third section image" }
   ]
+}
+
+Escape hatch (use ONLY if no non-duplicate angle is possible):
+{
+  "status": "cluster_exhausted",
+  "reasoning": "one sentence explaining which angles are saturated"
 }`
 }

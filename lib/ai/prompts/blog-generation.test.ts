@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildKeywordGroupSelectionPrompt } from "./blog-generation"
+import { buildBlogGenerationPrompt, buildKeywordGroupSelectionPrompt } from "./blog-generation"
 
 describe("buildKeywordGroupSelectionPrompt with recency", () => {
   const baseInput = {
@@ -41,5 +41,62 @@ describe("buildKeywordGroupSelectionPrompt with recency", () => {
     })
 
     expect(prompt).toMatch(/secondary keywords may overlap/i)
+  })
+})
+
+describe("buildBlogGenerationPrompt with angle + differentiation", () => {
+  const baseInput = {
+    siteNiche: "n",
+    siteAudience: "a",
+    siteTone: "t",
+    siteTopics: ["topic"],
+    primaryKeyword: { id: "k1", keyword: "kw", searchVolume: 100, intent: "informational", cluster: "c1" },
+    secondaryKeywords: [],
+    existingPosts: [],
+  }
+
+  it("includes the assigned angle when selectedAngle is provided", () => {
+    const prompt = buildBlogGenerationPrompt({
+      ...baseInput,
+      selectedAngle: { id: "a1", text: "for beginners" },
+      recentClusterPosts: [],
+    })
+
+    expect(prompt).toContain("Assigned angle")
+    expect(prompt).toContain("for beginners")
+  })
+
+  it("omits the assigned angle block when selectedAngle is null", () => {
+    const prompt = buildBlogGenerationPrompt({
+      ...baseInput,
+      selectedAngle: null,
+      recentClusterPosts: [],
+    })
+
+    expect(prompt).not.toContain("Assigned angle")
+  })
+
+  it("lists recent cluster posts for differentiation", () => {
+    const prompt = buildBlogGenerationPrompt({
+      ...baseInput,
+      selectedAngle: null,
+      recentClusterPosts: [
+        { title: "Old Post", excerpt: "Summary", angle: "for pros" },
+      ],
+    })
+
+    expect(prompt).toContain("Old Post")
+    expect(prompt).toContain("for pros")
+  })
+
+  it("describes the cluster_exhausted escape hatch in the output schema", () => {
+    const prompt = buildBlogGenerationPrompt({
+      ...baseInput,
+      selectedAngle: null,
+      recentClusterPosts: [],
+    })
+
+    expect(prompt).toContain("cluster_exhausted")
+    expect(prompt).toContain('"status"')
   })
 })
