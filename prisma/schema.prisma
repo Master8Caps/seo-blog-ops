@@ -81,7 +81,8 @@ model Keyword {
   aiSelected Boolean @default(false) @map("ai_selected")
 
   // Relations
-  posts Post[]
+  posts  Post[]
+  angles KeywordAngle[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -109,6 +110,8 @@ model Post {
   // SEO context
   keywordId String?  @map("keyword_id")
   keyword   Keyword? @relation(fields: [keywordId], references: [id], onDelete: SetNull)
+  angleId   String?       @map("angle_id")
+  angle     KeywordAngle? @relation(fields: [angleId], references: [id], onDelete: SetNull)
 
   // Workflow
   status      String    @default("draft")
@@ -216,6 +219,18 @@ model UsageEvent {
   @@index([createdAt(sort: Desc)])
   @@index([provider])
   @@map("usage_events")
+}
+
+model KeywordAngle {
+  id        String   @id @default(uuid())
+  keywordId String   @map("keyword_id")
+  keyword   Keyword  @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  text      String
+  posts     Post[]
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([keywordId])
+  @@map("keyword_angles")
 }
 
 model ExternalPost {
