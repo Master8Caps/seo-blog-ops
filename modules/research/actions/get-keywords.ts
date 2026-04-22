@@ -6,16 +6,31 @@ export async function getKeywordsForSiteId(
   siteId: string,
   status?: string
 ) {
-  return prisma.keyword.findMany({
+  const rows = await prisma.keyword.findMany({
     where: {
       siteId,
       ...(status ? { status } : {}),
     },
+    include: { _count: { select: { angles: true } } },
     orderBy: [
       { relevanceScore: "desc" },
       { searchVolume: "desc" },
     ],
   })
+
+  return rows.map((r) => ({
+    id: r.id,
+    keyword: r.keyword,
+    searchVolume: r.searchVolume,
+    cpc: r.cpc,
+    competition: r.competition,
+    relevanceScore: r.relevanceScore,
+    intent: r.intent,
+    cluster: r.cluster,
+    status: r.status,
+    aiSelected: r.aiSelected,
+    angleCount: r._count.angles,
+  }))
 }
 
 export async function clearKeywords(siteId: string) {

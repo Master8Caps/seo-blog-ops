@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Check, X, ArrowUpDown, Layers, ChevronDown, Sparkles } from "lucide-react"
+import { Check, X, ArrowUpDown, Layers, ChevronDown, Sparkles, RefreshCw } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +23,7 @@ import {
   updateKeywordStatus,
   bulkUpdateKeywordStatus,
 } from "@/modules/research/actions/update-keyword"
+import { regenerateAnglesForKeyword } from "@/modules/research/actions/backfill-angles"
 
 type SortField = "keyword" | "searchVolume" | "cpc" | "relevanceScore"
 type GroupField = "none" | "competition" | "intent" | "cluster" | "status"
@@ -58,6 +59,7 @@ interface KeywordRow {
   cluster: string | null
   status: string
   aiSelected: boolean
+  angleCount: number
 }
 
 interface KeywordTableProps {
@@ -118,6 +120,42 @@ function getGroupOrder(field: GroupField): Record<string, number> {
     default:
       return {}
   }
+}
+
+function AngleCell({ kw }: { kw: KeywordRow }) {
+  const [regenerating, setRegenerating] = useState(false)
+  const [count, setCount] = useState(kw.angleCount)
+
+  async function handleRegenerate() {
+    if (kw.status !== "approved") return
+    setRegenerating(true)
+    try {
+      const result = await regenerateAnglesForKeyword(kw.id)
+      if (result.success && "count" in result) {
+        setCount(result.count)
+      }
+    } finally {
+      setRegenerating(false)
+    }
+  }
+
+  if (kw.status !== "approved") {
+    return <span className="text-muted-foreground">—</span>
+  }
+
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <span className={count === 0 ? "text-yellow-400" : ""}>{count}</span>
+      <button
+        onClick={handleRegenerate}
+        disabled={regenerating}
+        className="rounded p-1 hover:bg-primary/10 text-primary transition-colors disabled:opacity-50"
+        title="Regenerate angles"
+      >
+        <RefreshCw className={`h-3 w-3 ${regenerating ? "animate-spin" : ""}`} />
+      </button>
+    </div>
+  )
 }
 
 export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
@@ -235,6 +273,7 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
           </TableHead>
           <TableHead>Intent</TableHead>
           <TableHead>Cluster</TableHead>
+          <TableHead className="text-right">Angles</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="w-24">Actions</TableHead>
         </TableRow>
@@ -291,6 +330,9 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
         <TableCell className="text-xs text-muted-foreground">
           {kw.cluster ?? "—"}
         </TableCell>
+        <TableCell className="text-right">
+          <AngleCell kw={kw} />
+        </TableCell>
         <TableCell>
           <div className="flex items-center gap-1.5">
             <Badge variant="outline" className={`text-xs capitalize ${statStyle.className}`}>
@@ -344,7 +386,7 @@ export function KeywordTable({ keywords: propKeywords }: KeywordTableProps) {
         <>
           {showGroupHeader && (
             <TableRow key={`group-${groupKey}-${kw.id}`} className="bg-muted/30">
-              <TableCell colSpan={10} className="py-2">
+              <TableCell colSpan={11} className="py-2">
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {groupKey}
                 </span>
