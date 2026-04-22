@@ -19,6 +19,8 @@ import {
 } from "../services/image-generator"
 import { getInternalLinkCandidates } from "../services/get-internal-link-candidates"
 import { getRecentKeywordsAndClusters } from "@/modules/content/services/get-recent-keywords"
+import { selectAngleForKeyword } from "../services/select-angle"
+import { getRecentClusterPosts } from "../services/get-recent-cluster-posts"
 
 interface GeneratePostResult {
   success: boolean
@@ -138,6 +140,24 @@ export async function generatePost(
         .filter((k): k is NonNullable<typeof k> => k != null && k.id !== primaryKw.id)
     }
 
+    // Step 1b: Fetch cluster-scoped recent posts + pick an angle
+    await updateJobProgress(jobId, "Selecting angle...")
+    const recentClusterPosts = await getRecentClusterPosts(siteId, primaryKw.cluster)
+    const selectedAngle = await selectAngleForKeyword({
+      keywordId: primaryKw.id,
+      primaryKeyword: primaryKw.keyword,
+      siteId,
+      siteNiche: site.niche ?? "unknown",
+      recentClusterPosts,
+      jobId,
+    })
+
+    if (!selectedAngle) {
+      console.warn(
+        `[generate-post] keyword ${primaryKw.id} ("${primaryKw.keyword}") has no angles — proceeding with angleId: null`
+      )
+    }
+
     // Step 2: Generate blog content with Claude
     await updateJobProgress(jobId, "Writing blog content with AI...")
     const existingPosts = await getInternalLinkCandidates(siteId)
@@ -149,6 +169,8 @@ export async function generatePost(
       primaryKeyword: primaryKw,
       secondaryKeywords: secondaryKws,
       existingPosts,
+      selectedAngle,
+      recentClusterPosts,
     })
 
     const message = await createMessage({
@@ -166,7 +188,22 @@ export async function generatePost(
       return { success: false, error: "No response from Claude" }
     }
 
-    const blog = parseAIJson<BlogGenerationResult>(textBlock.text) as BlogGenerationResult
+    const parsed = parseAIJson<BlogGenerationResult>(textBlock.text) as BlogGenerationResult
+
+    if (parsed.status === "cluster_exhausted") {
+      await mergeJobPayload(jobId, {
+        step: "Cluster exhausted — needs review",
+        needsReview: true,
+        clusterExhausted: true,
+        clusterExhaustedReason: parsed.reasoning,
+      })
+      return {
+        success: false,
+        error: `Cluster exhausted for keyword "${primaryKw.keyword}": ${parsed.reasoning}`,
+      }
+    }
+
+    const blog = parsed
 
     // Step 3: Create post record (linked to primary keyword)
     await updateJobProgress(jobId, "Saving draft post...")
@@ -175,6 +212,7 @@ export async function generatePost(
       data: {
         siteId,
         keywordId: primaryKw.id,
+        angleId: selectedAngle?.id ?? null,
         title: blog.title,
         slug: uniqueSlug,
         content: blog.content,
@@ -183,7 +221,7 @@ export async function generatePost(
         metaDesc: blog.metaDesc,
         status: "draft",
         generatedBy: "claude-sonnet",
-        promptVersion: "v2",
+        promptVersion: "v3",
       },
     })
 
