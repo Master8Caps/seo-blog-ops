@@ -45,6 +45,11 @@ model Site {
   onboardingStatus String    @default("pending") @map("onboarding_status")
   lastCrawledAt    DateTime? @map("last_crawled_at")
 
+  // GSC integration (Phase 11 / v2 Feature 1)
+  gscProperty      String?  @map("gsc_property")
+  sitemapUrl       String?  @map("sitemap_url")
+  indexNowVerified Boolean  @default(false) @map("indexnow_verified")
+
   // Relations
   keywords      Keyword[]
   posts         Post[]
@@ -52,6 +57,10 @@ model Site {
   researchRuns  ResearchRun[]
   usageEvents   UsageEvent[]
   externalPosts ExternalPost[]
+  gscMetricsDaily  GscMetricDaily[]
+  gscMetricsPage   GscMetricPage[]
+  gscMetricsQuery  GscMetricQuery[]
+  indexingLogs     IndexingLog[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -132,7 +141,8 @@ model Post {
   generatedBy   String? @map("generated_by")
   promptVersion String? @map("prompt_version")
 
-  usageEvents UsageEvent[]
+  usageEvents  UsageEvent[]
+  indexingLogs IndexingLog[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -251,4 +261,85 @@ model ExternalPost {
   @@unique([siteId, externalId])
   @@index([siteId])
   @@map("external_posts")
+}
+
+model GoogleAuth {
+  id            String   @id @default(dbgenerated("'singleton'"))
+  refreshToken  String   @map("refresh_token")
+  scope         String
+  connectedAt   DateTime @default(now()) @map("connected_at")
+  connectedBy   String?  @map("connected_by")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("google_auth")
+}
+
+model GscMetricDaily {
+  id          String   @id @default(uuid())
+  siteId      String   @map("site_id")
+  site        Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  clicks      Int
+  impressions Int
+  ctr         Float
+  position    Float
+
+  @@unique([siteId, date])
+  @@index([siteId, date(sort: Desc)])
+  @@map("gsc_metric_daily")
+}
+
+model GscMetricPage {
+  id          String   @id @default(uuid())
+  siteId      String   @map("site_id")
+  site        Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  page        String
+  window      String
+  clicks      Int
+  impressions Int
+  ctr         Float
+  position    Float
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // NOTE: SQL uniqueness is enforced via md5(page) expression index
+  // (see migration 011) to avoid btree size limits. @@unique below is for Prisma client only.
+  @@unique([siteId, page, window])
+  @@index([siteId, clicks(sort: Desc)])
+  @@map("gsc_metric_page")
+}
+
+model GscMetricQuery {
+  id          String   @id @default(uuid())
+  siteId      String   @map("site_id")
+  site        Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  query       String
+  window      String
+  clicks      Int
+  impressions Int
+  ctr         Float
+  position    Float
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // NOTE: SQL uniqueness is enforced via md5(query) expression index
+  // (see migration 011) to avoid btree size limits. @@unique below is for Prisma client only.
+  @@unique([siteId, query, window])
+  @@index([siteId, clicks(sort: Desc)])
+  @@map("gsc_metric_query")
+}
+
+model IndexingLog {
+  id         String   @id @default(uuid())
+  postId     String?  @map("post_id")
+  post       Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  siteId     String   @map("site_id")
+  site       Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  url        String
+  target     String
+  status     String
+  error      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([siteId, createdAt(sort: Desc)])
+  @@index([postId])
+  @@map("indexing_log")
 }

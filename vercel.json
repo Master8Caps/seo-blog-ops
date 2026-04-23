@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/weekly",
       "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/cron/gsc-sync",
+      "schedule": "0 6 * * *"
     }
   ]
 }

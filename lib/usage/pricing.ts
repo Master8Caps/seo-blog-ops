@@ -66,6 +66,9 @@ export function computeCostUsd(input: ComputeCostInput): number {
       // The wrapper passes that value through to logUsageEvent.costUsdOverride.
       return 0
 
+    case "google":
+      return 0
+
     default: {
       const _exhaustive: never = provider
       throw new Error(`Unknown provider: ${_exhaustive}`)

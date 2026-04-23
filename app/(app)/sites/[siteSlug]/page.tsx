@@ -11,6 +11,7 @@ import { AutopilotToggle } from "@/components/shared/autopilot-toggle"
 import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
 import { notFound } from "next/navigation"
 import type { SiteProfile } from "@/modules/sites/types"
+import { AnalyticsConnectionCard } from "@/modules/integrations/components/AnalyticsConnectionCard"
 
 export default async function SiteDetailPage({
   params,
@@ -73,6 +74,9 @@ export default async function SiteDetailPage({
       <div className="rounded-lg border border-border bg-card p-4">
         <AutopilotToggle siteId={site.id} initialValue={site.autopilot} />
       </div>
+
+      {/* Analytics connection status */}
+      <AnalyticsConnectionCard siteId={site.id} />
 
       {/* SEO Profile */}
       {profile && (

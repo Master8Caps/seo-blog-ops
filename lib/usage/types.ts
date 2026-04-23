@@ -1,4 +1,4 @@
-export type Provider = "anthropic" | "gemini" | "stealthgpt" | "dataforseo" | "jina"
+export type Provider = "anthropic" | "gemini" | "stealthgpt" | "dataforseo" | "jina" | "google"
 
 export type Operation =
   | "generate-content"
@@ -13,6 +13,11 @@ export type Operation =
   | "kw-for-keywords"
   | "generate-angles"
   | "select-angle"
+  | "gsc-sync"
+  | "gsc-auto-match"
+  | "indexing-api"
+  | "sitemap-resubmit"
+  | "indexnow-ping"
 
 export interface Attribution {
   siteId?: string

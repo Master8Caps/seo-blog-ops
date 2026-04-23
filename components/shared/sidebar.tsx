@@ -13,6 +13,7 @@ import {
   ChevronRight,
   LogOut,
   BookOpen,
+  BarChart3,
 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -39,6 +40,7 @@ const mainNavItems = [
   { href: "/sites", label: "Sites", icon: Globe, badgeKey: null as null | "activity" },
   { href: "/content", label: "Content", icon: FileText, badgeKey: null as null | "activity" },
   { href: "/activity", label: "Activity", icon: Activity, badgeKey: "activity" as const },
+  { href: "/analytics", label: "Analytics", icon: BarChart3, badgeKey: null as null | "activity" },
   { href: "/costs", label: "Costs", icon: Wallet, badgeKey: null as null | "activity" },
   { href: "/how-it-works", label: "How it works", icon: BookOpen, badgeKey: null as null | "activity" },
 ]

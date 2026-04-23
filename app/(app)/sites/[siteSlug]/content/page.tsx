@@ -170,6 +170,7 @@ export default function SiteContentPage() {
                 <th className="p-3 font-medium">Title</th>
                 <th className="p-3 font-medium">Keyword</th>
                 <th className="p-3 font-medium">Status</th>
+                <th className="p-3 font-medium">Clicks (28d)</th>
                 <th className="p-3 font-medium">Created</th>
               </tr>
             </thead>
@@ -193,6 +194,9 @@ export default function SiteContentPage() {
                       <Badge variant="outline" className={`text-xs ${status.className}`}>
                         {status.label}
                       </Badge>
+                    </td>
+                    <td className="p-3 text-sm text-muted-foreground tabular-nums">
+                      {post.clicks ?? "—"}
                     </td>
                     <td className="p-3 text-sm text-muted-foreground">
                       {new Date(post.createdAt).toLocaleDateString()}
