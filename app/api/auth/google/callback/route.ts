@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import type { Auth } from "googleapis"
 import { createOAuth2Client } from "@/lib/google/client"
 import { storeRefreshToken } from "@/lib/google/auth"
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const { data: { user } } = await supabase.auth.getUser()
   const grantedScope = tokens.scope ?? ""
   await storeRefreshToken(tokens.refresh_token, grantedScope, user?.email ?? "unknown")
+  revalidatePath("/settings/integrations/google")
 
   return NextResponse.redirect(
     new URL("/settings/integrations/google?connected=1", request.url)
