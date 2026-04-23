@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Search, FileText, Send, Wallet } from "lucide-react"
+import { LayoutDashboard, Search, FileText, Send, BarChart3, Wallet } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface SiteTabsProps {
@@ -14,6 +14,7 @@ const tabs = [
   { label: "Research", href: "/research", icon: Search },
   { label: "Content", href: "/content", icon: FileText },
   { label: "Publishing", href: "/publishing", icon: Send },
+  { label: "Analytics", href: "/analytics", icon: BarChart3 },
   { label: "Costs", href: "/costs", icon: Wallet },
 ]
 
