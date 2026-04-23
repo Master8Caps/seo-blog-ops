@@ -264,7 +264,7 @@ model ExternalPost {
 }
 
 model GoogleAuth {
-  id            String   @id @default("singleton")
+  id            String   @id @default(dbgenerated("'singleton'"))
   refreshToken  String   @map("refresh_token")
   scope         String
   connectedAt   DateTime @default(now()) @map("connected_at")
@@ -301,6 +301,8 @@ model GscMetricPage {
   position    Float
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  // NOTE: SQL uniqueness is enforced via md5(page) expression index
+  // (see migration 011) to avoid btree size limits. @@unique below is for Prisma client only.
   @@unique([siteId, page, window])
   @@index([siteId, clicks(sort: Desc)])
   @@map("gsc_metric_page")
@@ -318,6 +320,8 @@ model GscMetricQuery {
   position    Float
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  // NOTE: SQL uniqueness is enforced via md5(query) expression index
+  // (see migration 011) to avoid btree size limits. @@unique below is for Prisma client only.
   @@unique([siteId, query, window])
   @@index([siteId, clicks(sort: Desc)])
   @@map("gsc_metric_query")
