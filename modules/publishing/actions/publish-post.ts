@@ -2,6 +2,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 import { prisma } from "@/lib/db/prisma"
 import { decrypt } from "@/lib/crypto"
 import {
@@ -14,6 +15,17 @@ import {
 } from "@/modules/publishing/services/standard-api"
 import { classifyPost } from "@/modules/publishing/services/classify-post"
 import { renderMarkdown } from "@/lib/markdown"
+import { indexPublishedPost } from "@/modules/integrations/services/indexing"
+
+function fireAndForgetIndexing(postId: string): void {
+  after(async () => {
+    try {
+      await indexPublishedPost(postId)
+    } catch (err) {
+      console.error("[publish-post] indexing pipeline failed:", err)
+    }
+  })
+}
 
 interface PublishResult {
   success: boolean
@@ -202,6 +214,7 @@ async function publishToStandardApi(
     }
 
     revalidatePaths(post.id, site.slug)
+    fireAndForgetIndexing(post.id)
     return { success: true, publishedUrl: result.publishedUrl }
   } catch (error) {
     return {
@@ -352,6 +365,7 @@ async function publishToWordPress(
     }
 
     revalidatePaths(post.id, site.slug)
+    fireAndForgetIndexing(post.id)
     return { success: true, publishedUrl: wpPost.link }
   } catch (error) {
     return {
