@@ -47,6 +47,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   await storeRefreshToken(tokens.refresh_token, grantedScope, user?.email ?? "unknown")
   revalidatePath("/settings/integrations/google")
 
+  import("@/modules/integrations/services/gsc-auto-match").then(({ autoMatchSitesToGscProperties }) =>
+    autoMatchSitesToGscProperties().catch((err) =>
+      console.error("[google/callback] auto-match failed:", err)
+    )
+  )
+
   return NextResponse.redirect(
     new URL("/settings/integrations/google?connected=1", request.url)
   )
