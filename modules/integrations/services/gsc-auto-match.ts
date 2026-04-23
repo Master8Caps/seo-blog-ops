@@ -71,11 +71,16 @@ export async function autoMatchSitesToGscProperties(): Promise<AutoMatchResult> 
     const tied = scored.filter((s) => s.score === top.score)
 
     if (top.score >= MATCH_THRESHOLD && tied.length === 1) {
-      result.matched.push({ siteId: site.id, property: top.property })
-      await prisma.site.update({
-        where: { id: site.id },
-        data: { gscProperty: top.property },
-      })
+      try {
+        await prisma.site.update({
+          where: { id: site.id },
+          data: { gscProperty: top.property },
+        })
+        result.matched.push({ siteId: site.id, property: top.property })
+      } catch (err) {
+        console.error(`[gsc-auto-match] update failed for site ${site.id}:`, err)
+        result.unmatched.push({ siteId: site.id, siteUrl: site.url })
+      }
     } else if (top.score >= MATCH_THRESHOLD && tied.length > 1) {
       result.ambiguous.push({ siteId: site.id, candidates: tied.map((t) => t.property) })
     } else {

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { revalidatePath } from "next/cache"
 import type { Auth } from "googleapis"
 import { createOAuth2Client } from "@/lib/google/client"
@@ -47,11 +47,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   await storeRefreshToken(tokens.refresh_token, grantedScope, user?.email ?? "unknown")
   revalidatePath("/settings/integrations/google")
 
-  import("@/modules/integrations/services/gsc-auto-match").then(({ autoMatchSitesToGscProperties }) =>
-    autoMatchSitesToGscProperties().catch((err) =>
+  after(async () => {
+    try {
+      const { autoMatchSitesToGscProperties } = await import(
+        "@/modules/integrations/services/gsc-auto-match"
+      )
+      await autoMatchSitesToGscProperties()
+    } catch (err) {
       console.error("[google/callback] auto-match failed:", err)
-    )
-  )
+    }
+  })
 
   return NextResponse.redirect(
     new URL("/settings/integrations/google?connected=1", request.url)
