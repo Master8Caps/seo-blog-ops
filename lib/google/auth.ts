@@ -38,40 +38,42 @@ export async function isConnected(): Promise<boolean> {
   return row !== null
 }
 
-export async function _readRefreshToken(): Promise<string | null> {
-  const row = await prisma.googleAuth.findUnique({ where: { id: "singleton" } })
-  if (!row) return null
-  return decrypt(row.refreshToken)
-}
-
 let cachedToken: { value: string; expiresAt: number } | null = null
+let inFlightRefresh: Promise<string> | null = null
 const SAFETY_MARGIN_MS = 5 * 60 * 1000
 
 export async function getAccessToken(): Promise<string> {
   if (cachedToken && cachedToken.expiresAt - Date.now() > SAFETY_MARGIN_MS) {
     return cachedToken.value
   }
+  if (inFlightRefresh) return inFlightRefresh
 
-  const refreshToken = await _readRefreshToken()
-  if (!refreshToken) {
-    throw new Error("Google not connected — store a refresh token first")
-  }
-
-  const client = createOAuth2Client()
-  client.setCredentials({ refresh_token: refreshToken })
-  const { credentials } = await client.refreshAccessToken()
-
-  if (!credentials.access_token || !credentials.expiry_date) {
-    throw new Error("Refresh response missing access_token or expiry_date")
-  }
-
-  cachedToken = {
-    value: credentials.access_token,
-    expiresAt: credentials.expiry_date,
-  }
-  return cachedToken.value
+  inFlightRefresh = (async () => {
+    try {
+      const row = await prisma.googleAuth.findUnique({ where: { id: "singleton" } })
+      const refreshToken = row ? decrypt(row.refreshToken) : null
+      if (!refreshToken) {
+        throw new Error("Google not connected — store a refresh token first")
+      }
+      const client = createOAuth2Client()
+      client.setCredentials({ refresh_token: refreshToken })
+      const { credentials } = await client.refreshAccessToken()
+      if (!credentials.access_token || !credentials.expiry_date) {
+        throw new Error("Refresh response missing access_token or expiry_date")
+      }
+      cachedToken = {
+        value: credentials.access_token,
+        expiresAt: credentials.expiry_date,
+      }
+      return cachedToken.value
+    } finally {
+      inFlightRefresh = null
+    }
+  })()
+  return inFlightRefresh
 }
 
 export function _resetTokenCache(): void {
   cachedToken = null
+  inFlightRefresh = null
 }

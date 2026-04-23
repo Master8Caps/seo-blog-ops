@@ -16,6 +16,7 @@ vi.mock("@/lib/crypto", () => ({
 }))
 
 import { prisma } from "@/lib/db/prisma"
+import { decrypt } from "@/lib/crypto"
 import { storeRefreshToken, clearGoogleAuth, isConnected } from "@/lib/google/auth"
 
 describe("storeRefreshToken", () => {
@@ -125,5 +126,48 @@ describe("getAccessToken", () => {
     expect(await getAccessToken()).toBe("at-1")
     expect(await getAccessToken()).toBe("at-2")
     expect(refreshAccessToken).toHaveBeenCalledTimes(2)
+  })
+
+  it("throws when refresh response is missing access_token", async () => {
+    vi.mocked(prisma.googleAuth.findUnique).mockResolvedValueOnce({
+      id: "singleton",
+      refreshToken: "enc(rt-xyz)",
+    } as never)
+    vi.mocked(createOAuth2Client).mockReturnValue({
+      setCredentials: vi.fn(),
+      refreshAccessToken: vi
+        .fn()
+        .mockResolvedValue({ credentials: { expiry_date: Date.now() + 3600_000 } }),
+    } as never)
+    await expect(getAccessToken()).rejects.toThrow(/missing access_token/i)
+  })
+
+  it("throws when refresh response is missing expiry_date", async () => {
+    vi.mocked(prisma.googleAuth.findUnique).mockResolvedValueOnce({
+      id: "singleton",
+      refreshToken: "enc(rt-xyz)",
+    } as never)
+    vi.mocked(createOAuth2Client).mockReturnValue({
+      setCredentials: vi.fn(),
+      refreshAccessToken: vi
+        .fn()
+        .mockResolvedValue({ credentials: { access_token: "at-1" } }),
+    } as never)
+    await expect(getAccessToken()).rejects.toThrow(/missing access_token or expiry_date/i)
+  })
+
+  it("decrypts the stored refresh token before using it", async () => {
+    vi.mocked(prisma.googleAuth.findUnique).mockResolvedValueOnce({
+      id: "singleton",
+      refreshToken: "enc(rt-xyz)",
+    } as never)
+    vi.mocked(createOAuth2Client).mockReturnValue({
+      setCredentials: vi.fn(),
+      refreshAccessToken: vi
+        .fn()
+        .mockResolvedValue({ credentials: { access_token: "at-1", expiry_date: Date.now() + 3600_000 } }),
+    } as never)
+    await getAccessToken()
+    expect(vi.mocked(decrypt)).toHaveBeenCalledWith("enc(rt-xyz)")
   })
 })
