@@ -12,6 +12,7 @@ import { getSiteBySlug } from "@/modules/sites/actions/get-sites"
 import { notFound } from "next/navigation"
 import type { SiteProfile } from "@/modules/sites/types"
 import { AnalyticsConnectionCard } from "@/modules/integrations/components/AnalyticsConnectionCard"
+import { RetryCrawlButton } from "@/modules/sites/components/RetryCrawlButton"
 
 export default async function SiteDetailPage({
   params,
@@ -31,6 +32,12 @@ export default async function SiteDetailPage({
       {site.description && (
         <p className="text-muted-foreground">{site.description}</p>
       )}
+
+      <RetryCrawlButton
+        siteId={site.id}
+        status={site.onboardingStatus}
+        lastCrawledAt={site.lastCrawledAt}
+      />
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
