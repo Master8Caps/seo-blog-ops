@@ -44,6 +44,29 @@ function apiHeaders(apiKey: string, contentType?: string): Record<string, string
   return headers
 }
 
+function isJsonResponse(res: Response): boolean {
+  const ct = res.headers.get("content-type") ?? ""
+  return ct.toLowerCase().includes("application/json")
+}
+
+/**
+ * Parse a response as JSON, but first verify the Content-Type is actually JSON.
+ * A 200 response with an HTML body (very common when a Next.js/SPA target falls
+ * through its catch-all route for a missing API path) would otherwise throw
+ * "Unexpected token '<', '<!doctype '..." deep in the consuming code.
+ */
+async function parseJsonOrThrow<T>(res: Response, endpoint: string): Promise<T> {
+  if (!isJsonResponse(res)) {
+    const snippet = (await res.text().catch(() => "")).slice(0, 200)
+    throw new Error(
+      `${endpoint} returned ${res.status} with non-JSON body (content-type: ${res.headers.get("content-type") ?? "none"}). ` +
+        `The /api/publish/* endpoints probably aren't deployed on the target yet — the site served its fallback page instead. ` +
+        (snippet ? `Response starts: ${snippet}` : "")
+    )
+  }
+  return (await res.json()) as T
+}
+
 /**
  * Test connection by fetching categories. If this works, the API key is valid.
  */
@@ -101,6 +124,20 @@ export async function testConnection(
       }
     }
 
+    // 200 OK but wrong content type — common on Vercel/Next when the /api/publish
+    // route isn't deployed and the app's catch-all/fallback renders the homepage.
+    if (!isJsonResponse(res)) {
+      const bodySnippet = (await res.text().catch(() => "")).slice(0, 200)
+      return {
+        success: false,
+        error:
+          `Target returned ${res.status} but content-type is "${res.headers.get("content-type") ?? "none"}" — not JSON. ` +
+          `The /api/publish/metadata/categories endpoint probably isn't deployed on the target yet. ` +
+          `Verify the publish API is live at ${endpoint} and that the site URL in the dashboard points to the right origin. ` +
+          (bodySnippet ? `Response starts: ${bodySnippet}` : ""),
+      }
+    }
+
     // Connection works — fetch all metadata
     const metadata = await syncMetadata(siteUrl, trimmedKey)
     return { success: true, metadata }
@@ -125,22 +162,26 @@ export async function syncMetadata(
 ): Promise<ApiMetadata> {
   const headers = apiHeaders(apiKey)
 
+  const catEndpoint = apiUrl(siteUrl, "/metadata/categories")
+  const tagEndpoint = apiUrl(siteUrl, "/metadata/tags")
+  const ctxEndpoint = apiUrl(siteUrl, "/metadata/context")
+
   const [catRes, tagRes, ctxRes] = await Promise.all([
-    fetch(apiUrl(siteUrl, "/metadata/categories"), { headers }),
-    fetch(apiUrl(siteUrl, "/metadata/tags"), { headers }),
-    fetch(apiUrl(siteUrl, "/metadata/context"), { headers }),
+    fetch(catEndpoint, { headers }),
+    fetch(tagEndpoint, { headers }),
+    fetch(ctxEndpoint, { headers }),
   ])
 
   const categories: ApiCategory[] = catRes.ok
-    ? ((await catRes.json()) as { categories: ApiCategory[] }).categories
+    ? (await parseJsonOrThrow<{ categories: ApiCategory[] }>(catRes, catEndpoint)).categories
     : []
 
   const tags: string[] = tagRes.ok
-    ? ((await tagRes.json()) as { tags: string[] }).tags
+    ? (await parseJsonOrThrow<{ tags: string[] }>(tagRes, tagEndpoint)).tags
     : []
 
   const context: ApiContextGroup[] = ctxRes.ok
-    ? ((await ctxRes.json()) as { context: ApiContextGroup[] }).context
+    ? (await parseJsonOrThrow<{ context: ApiContextGroup[] }>(ctxRes, ctxEndpoint)).context
     : []
 
   return { categories, tags, context }
