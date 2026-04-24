@@ -53,6 +53,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         "@/modules/integrations/services/gsc-auto-match"
       )
       await autoMatchSitesToGscProperties()
+      revalidatePath("/settings/integrations/google")
     } catch (err) {
       console.error("[google/callback] auto-match failed:", err)
     }

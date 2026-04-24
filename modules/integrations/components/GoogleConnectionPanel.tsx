@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { disconnectGoogle } from "@/modules/integrations/actions/disconnect-google"
 import { runAutoMatch } from "@/modules/integrations/actions/auto-match-sites"
@@ -136,6 +136,14 @@ function SiteLinkRow({ site }: { site: SiteRow }) {
   const [value, setValue] = useState(site.gscProperty ?? "")
   const [pending, startTransition] = useTransition()
   const [saved, setSaved] = useState(false)
+
+  // Sync local input state when the server prop changes (e.g. after auto-match
+  // writes a new gscProperty). Without this, useState keeps its initial value
+  // forever and the input looks empty even though the DB has been updated.
+  useEffect(() => {
+    setValue(site.gscProperty ?? "")
+    setSaved(false)
+  }, [site.gscProperty])
 
   return (
     <tr className="border-t">
